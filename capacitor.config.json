@@ -1,0 +1,9 @@
+{
+  "appId": "com.jkgaming.wspacommand",
+  "appName": "WSPA Command",
+  "webDir": "www",
+  "backgroundColor": "#020d18",
+  "ios": {
+    "contentInset": "always"
+  }
+}

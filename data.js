@@ -1,33 +1,33 @@
 // ─── PERSISTENCE ──────────────────────────────────────────────────────────────
-function loadBank(){try{return parseInt(localStorage.getItem("wspa_bank")||"0",10);}catch(e){return 0;}}
-function saveBank(n){try{localStorage.setItem("wspa_bank",String(n));}catch(e){}}
-function loadOwned(){try{return JSON.parse(localStorage.getItem("wspa_owned")||"[]");}catch(e){return[];}}
-function saveOwned(a){try{localStorage.setItem("wspa_owned",JSON.stringify(a));}catch(e){}}
-function loadCodex(){try{return JSON.parse(localStorage.getItem("wspa_codex")||"[]");}catch(e){return[];}}
-function saveCodex(a){try{localStorage.setItem("wspa_codex",JSON.stringify(a));}catch(e){}}
+function loadBank(){try{return parseInt(gameStorage.getItem("wspa_bank")||"0",10);}catch(e){return 0;}}
+function saveBank(n){try{gameStorage.setItem("wspa_bank",String(n));}catch(e){}}
+function loadOwned(){try{return JSON.parse(gameStorage.getItem("wspa_owned")||"[]");}catch(e){return[];}}
+function saveOwned(a){try{gameStorage.setItem("wspa_owned",JSON.stringify(a));}catch(e){}}
+function loadCodex(){try{return JSON.parse(gameStorage.getItem("wspa_codex")||"[]");}catch(e){return[];}}
+function saveCodex(a){try{gameStorage.setItem("wspa_codex",JSON.stringify(a));}catch(e){}}
 // Heroes of Tomorrow — permanent unlocks (hero titles), persists across games like ownedShop
-function loadHotUnlocked(){try{return JSON.parse(localStorage.getItem("wspa_hot_unlocked")||"[]");}catch(e){return[];}}
-function saveHotUnlocked(a){try{localStorage.setItem("wspa_hot_unlocked",JSON.stringify(a));}catch(e){}}
+function loadHotUnlocked(){try{return JSON.parse(gameStorage.getItem("wspa_hot_unlocked")||"[]");}catch(e){return[];}}
+function saveHotUnlocked(a){try{gameStorage.setItem("wspa_hot_unlocked",JSON.stringify(a));}catch(e){}}
 // Team Development — one named team of hero titles, persists like ownedShop/codexUnlocked
-function loadTeam(){try{return JSON.parse(localStorage.getItem("wspa_team")||'{"name":"","members":[]}');}catch(e){return{name:"",members:[]};}}
-function saveTeam(t){try{localStorage.setItem("wspa_team",JSON.stringify(t));}catch(e){}}
+function loadTeam(){try{return JSON.parse(gameStorage.getItem("wspa_team")||'{"name":"","members":[]}');}catch(e){return{name:"",members:[]};}}
+function saveTeam(t){try{gameStorage.setItem("wspa_team",JSON.stringify(t));}catch(e){}}
 // Achievements — permanent, one-time unlocks (achievement keys), persists like ownedShop/codexUnlocked
-function loadAchievements(){try{return JSON.parse(localStorage.getItem("wspa_achievements")||"[]");}catch(e){return[];}}
-function saveAchievements(a){try{localStorage.setItem("wspa_achievements",JSON.stringify(a));}catch(e){}}
+function loadAchievements(){try{return JSON.parse(gameStorage.getItem("wspa_achievements")||"[]");}catch(e){return[];}}
+function saveAchievements(a){try{gameStorage.setItem("wspa_achievements",JSON.stringify(a));}catch(e){}}
 // Silphana redemption arc — persists across games like hotUnlocked.
 // aerosSent: the AEROS confidential log has been forwarded to George.
 // silphanaProspectReady: Silphana has since been defeated as a threat and is waiting in Heroes of Tomorrow.
-function loadAerosSent(){try{return localStorage.getItem("wspa_aeros_sent")==="1";}catch(e){return false;}}
-function saveAerosSent(v){try{localStorage.setItem("wspa_aeros_sent",v?"1":"0");}catch(e){}}
-function loadSilphanaProspectReady(){try{return localStorage.getItem("wspa_silphana_prospect_ready")==="1";}catch(e){return false;}}
-function saveSilphanaProspectReady(v){try{localStorage.setItem("wspa_silphana_prospect_ready",v?"1":"0");}catch(e){}}
+function loadAerosSent(){try{return gameStorage.getItem("wspa_aeros_sent")==="1";}catch(e){return false;}}
+function saveAerosSent(v){try{gameStorage.setItem("wspa_aeros_sent",v?"1":"0");}catch(e){}}
+function loadSilphanaProspectReady(){try{return gameStorage.getItem("wspa_silphana_prospect_ready")==="1";}catch(e){return false;}}
+function saveSilphanaProspectReady(v){try{gameStorage.setItem("wspa_silphana_prospect_ready",v?"1":"0");}catch(e){}}
 // High Score board — local top-10 runs by name + points, persists like ownedShop/codexUnlocked
 // Home-screen era dial: "modern" | "golden" | "silver". Open access for now —
 // this is the hook a future DLC lock would gate once purchases can survive a browser reset.
-function loadAgeMode(){try{const v=localStorage.getItem("wspa_age_mode");return(v==="golden"||v==="silver")?v:"modern";}catch(e){return"modern";}}
-function saveAgeMode(v){try{localStorage.setItem("wspa_age_mode",v);}catch(e){}}
-function loadHighScores(){try{return JSON.parse(localStorage.getItem("wspa_highscores")||"[]");}catch(e){return[];}}
-function saveHighScores(a){try{localStorage.setItem("wspa_highscores",JSON.stringify(a));}catch(e){}}
+function loadAgeMode(){try{const v=gameStorage.getItem("wspa_age_mode");return(v==="golden"||v==="silver")?v:"modern";}catch(e){return"modern";}}
+function saveAgeMode(v){try{gameStorage.setItem("wspa_age_mode",v);}catch(e){}}
+function loadHighScores(){try{return JSON.parse(gameStorage.getItem("wspa_highscores")||"[]");}catch(e){return[];}}
+function saveHighScores(a){try{gameStorage.setItem("wspa_highscores",JSON.stringify(a));}catch(e){}}
 function recordHighScore(name,points){
   const list=loadHighScores();
   list.push({name:(name||"DIRECTOR").toUpperCase().slice(0,14),points:Math.max(0,Math.floor(points||0))});
@@ -55,8 +55,8 @@ const ACHIEVEMENT_DEFS=[
 
 // ─── ENDINGS ──────────────────────────────────────────────────────────────────
 // Permanent, one-time unlocks (ending keys), persists like achievements.
-function loadEndings(){try{return JSON.parse(localStorage.getItem("wspa_endings")||"[]");}catch(e){return[];}}
-function saveEndings(a){try{localStorage.setItem("wspa_endings",JSON.stringify(a));}catch(e){}}
+function loadEndings(){try{return JSON.parse(gameStorage.getItem("wspa_endings")||"[]");}catch(e){return[];}}
+function saveEndings(a){try{gameStorage.setItem("wspa_endings",JSON.stringify(a));}catch(e){}}
 
 const ENDING_DEFS=[
   // ── DEFEAT ENDINGS ──

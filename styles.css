@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+@import url('vendor/fonts.css');
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#020d18;--bg2:#041525;--bg3:#071e32;--panel:#071e32;--panel2:#0a2540;

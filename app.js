@@ -15,7 +15,7 @@ function WorldMap({threats,depMap,score,target,tierLabel,zoom,pan,onZoomIn,onZoo
   useEffect(()=>{
     // Load world topojson and build paths using d3-geo
     Promise.all([
-      fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(r=>r.json())
+      fetch("vendor/countries-110m.json").then(r=>r.json())
     ]).then(([world])=>{
       const projection=d3.geoNaturalEarth1()
         .scale(92)
