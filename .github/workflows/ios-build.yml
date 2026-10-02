@@ -1,0 +1,40 @@
+name: iOS build check
+
+# Manual button: GitHub > Actions > "iOS build check" > Run workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Capacitor
+        run: npm install
+
+      - name: Assemble the web folder
+        run: |
+          mkdir -p www
+          cp index.html styles.css storage.js data.js logic.js app.js *.mp3 www/
+          cp -R portraits vendor www/
+
+      - name: Create and sync the iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Compile for the iOS Simulator (no signing)
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
