@@ -1,0 +1,1221 @@
+// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
+function loadBank(){try{return parseInt(localStorage.getItem("wspa_bank")||"0",10);}catch(e){return 0;}}
+function saveBank(n){try{localStorage.setItem("wspa_bank",String(n));}catch(e){}}
+function loadOwned(){try{return JSON.parse(localStorage.getItem("wspa_owned")||"[]");}catch(e){return[];}}
+function saveOwned(a){try{localStorage.setItem("wspa_owned",JSON.stringify(a));}catch(e){}}
+function loadCodex(){try{return JSON.parse(localStorage.getItem("wspa_codex")||"[]");}catch(e){return[];}}
+function saveCodex(a){try{localStorage.setItem("wspa_codex",JSON.stringify(a));}catch(e){}}
+// Heroes of Tomorrow — permanent unlocks (hero titles), persists across games like ownedShop
+function loadHotUnlocked(){try{return JSON.parse(localStorage.getItem("wspa_hot_unlocked")||"[]");}catch(e){return[];}}
+function saveHotUnlocked(a){try{localStorage.setItem("wspa_hot_unlocked",JSON.stringify(a));}catch(e){}}
+// Team Development — one named team of hero titles, persists like ownedShop/codexUnlocked
+function loadTeam(){try{return JSON.parse(localStorage.getItem("wspa_team")||'{"name":"","members":[]}');}catch(e){return{name:"",members:[]};}}
+function saveTeam(t){try{localStorage.setItem("wspa_team",JSON.stringify(t));}catch(e){}}
+// Achievements — permanent, one-time unlocks (achievement keys), persists like ownedShop/codexUnlocked
+function loadAchievements(){try{return JSON.parse(localStorage.getItem("wspa_achievements")||"[]");}catch(e){return[];}}
+function saveAchievements(a){try{localStorage.setItem("wspa_achievements",JSON.stringify(a));}catch(e){}}
+// Silphana redemption arc — persists across games like hotUnlocked.
+// aerosSent: the AEROS confidential log has been forwarded to George.
+// silphanaProspectReady: Silphana has since been defeated as a threat and is waiting in Heroes of Tomorrow.
+function loadAerosSent(){try{return localStorage.getItem("wspa_aeros_sent")==="1";}catch(e){return false;}}
+function saveAerosSent(v){try{localStorage.setItem("wspa_aeros_sent",v?"1":"0");}catch(e){}}
+function loadSilphanaProspectReady(){try{return localStorage.getItem("wspa_silphana_prospect_ready")==="1";}catch(e){return false;}}
+function saveSilphanaProspectReady(v){try{localStorage.setItem("wspa_silphana_prospect_ready",v?"1":"0");}catch(e){}}
+// High Score board — local top-10 runs by name + points, persists like ownedShop/codexUnlocked
+// Home-screen era dial: "modern" | "golden" | "silver". Open access for now —
+// this is the hook a future DLC lock would gate once purchases can survive a browser reset.
+function loadAgeMode(){try{const v=localStorage.getItem("wspa_age_mode");return(v==="golden"||v==="silver")?v:"modern";}catch(e){return"modern";}}
+function saveAgeMode(v){try{localStorage.setItem("wspa_age_mode",v);}catch(e){}}
+function loadHighScores(){try{return JSON.parse(localStorage.getItem("wspa_highscores")||"[]");}catch(e){return[];}}
+function saveHighScores(a){try{localStorage.setItem("wspa_highscores",JSON.stringify(a));}catch(e){}}
+function recordHighScore(name,points){
+  const list=loadHighScores();
+  list.push({name:(name||"DIRECTOR").toUpperCase().slice(0,14),points:Math.max(0,Math.floor(points||0))});
+  list.sort((a,b)=>b.points-a.points);
+  const top10=list.slice(0,10);
+  saveHighScores(top10);
+  return top10;
+}
+
+// ─── ACHIEVEMENTS ─────────────────────────────────────────────────────────────
+const ACHIEVEMENT_DEFS=[
+  {key:"watch_mine",title:"The Watch is mine",desc:"Beat the tutorial for the first time."},
+  {key:"new_beginnings",title:"New Beginnings",desc:"Get all three heroes from Heroes of Tomorrow for the first time."},
+  {key:"understand_it_now",title:"I understand it now",desc:"Unlock Morgana Pulse for the first time."},
+  {key:"do_your_history",title:"Do your History",desc:"Learn from Franco about the prior hero ages for the first time."},
+  {key:"why",title:"Why?",desc:"Stop the Silver Meadows HOA for the first time."},
+  {key:"my_bad",title:"My bad",desc:"Send a team of 8 or more heroes to fight the Leviathan for the first time."},
+  {key:"father_of_monsters",title:"Father of Monsters",desc:"Defeat Typhon for the first time."},
+  {key:"easy_does_it",title:"Easy Does It",desc:"Beat the game on Easy — reach 250 points in a single game."},
+  {key:"normal_operations",title:"Normal Operations",desc:"Beat the game on Normal — reach 500 points in a single game."},
+  {key:"beat_a_game",title:"Legendary Director",desc:"Beat the game on Legendary — reach 1000 points in a single game."},
+  {key:"civil_war",title:"Civil War",desc:"Make a hero go rogue for the first time."},
+  {key:"something_to_believe_in",title:"Something to believe in",desc:"Convert a villain to a hero for the first time."}
+];
+
+// ─── ENDINGS ──────────────────────────────────────────────────────────────────
+// Permanent, one-time unlocks (ending keys), persists like achievements.
+function loadEndings(){try{return JSON.parse(localStorage.getItem("wspa_endings")||"[]");}catch(e){return[];}}
+function saveEndings(a){try{localStorage.setItem("wspa_endings",JSON.stringify(a));}catch(e){}}
+
+const ENDING_DEFS=[
+  // ── DEFEAT ENDINGS ──
+  {key:"civil_war",kind:"loss",title:"Civil War",trigger:"Lose to the Rogue Council.",
+    text:"You fractured the organization. People are dead. The world has never been more afraid. Now, from the ashes, the survivors have to rebuild without you.",
+    portrait:"portraits/Roguecouncilloss.jpg"},
+  {key:"times_up",kind:"loss",title:"Time's Up",trigger:"Any non-villain threat reaches 0.",
+    text:"You underestimated the severity, and now millions have to pay the price.",
+    portrait:"portraits/TimesUp.jpg"},
+  {key:"acts_of_evil",kind:"loss",title:"Acts of Evil",trigger:"Lose to a supervillain.",
+    text:"Villains aren't easy to fight, but you can't afford to lose.",
+    portrait:"portraits/Losetoavillain.jpg"},
+  // ── VICTORY ENDINGS ──
+  {key:"good_ending",kind:"win",title:"The Good Ending",trigger:"Win a game with Silphana permanently unlocked as a hero.",
+    text:"When you began, there was a rift. You fixed it. And now the world can heal.",
+    portrait:"portraits/WSPASilphanaending.png"},
+  {key:"next_generation",kind:"win",title:"The Next Generation",trigger:"Win a game with Captain Shamrock, Sakura, and Skull Crusher alive.",
+    text:"They have inspired millions to aspire to something more. The world has never been safer.",
+    portrait:"portraits/Tomorrow.png"},
+  {key:"modern_age",kind:"win",title:"Director For The Modern Age",trigger:"Reach 1000 points.",
+    text:"The watch was yours, and you did not fail. Stand tall.",
+    portrait:"portraits/ModernAge.jpg"}
+];
+
+// ─── CONFIDENTIAL BRIEFINGS (password-gated) ───────────────────────────────────
+// Each key is the password (case-insensitive) the player types on the CONFIDENTIAL screen.
+// excludeTitles are hero titles to leave off the "Single Combat Loss Projections" list,
+// in addition to John, who is always excluded (via isJohn).
+const CONFIDENTIAL_BRIEFINGS={
+  KRONOS:{
+    heading:"⚠ CONFIDENTIAL — OMNIVIPORIX BRIEFING",
+    portrait:"portraits/Omniviporix.png",
+    desc:"Someone extremely intelligent is designing hyper advanced artificial intelligence androids capable of killing most superheroes. Every time this droid is defeated, it has come back stronger. Extreme ongoing threat. 6 hero fatalities at this point. Deeply concerned that it can kill any hero on the roster. Only solution, teamwork.",
+    quote:"\"Odds of defeating Omniviporix in single combat calculated at less than 3% among our top tier. Less than a tenth of a percent for any hero with a power level lower than 5. Current threat level only surpassed by Maniac, Silphana, Typhon, and Leviathan. Future threat level unmatched.\" — George Nichols",
+    excludeTitles:[]
+  },
+  TYPHON:{
+    heading:"⚠ CONFIDENTIAL — TYPHON: FATHER OF MONSTERS BRIEFING",
+    portrait:"portraits/Typhon.png",
+    desc:"Father of Monsters. This creature is unbelievably powerful. No heroes would survive single combat. None. Hasn't woken for thousands of years, try to keep it that way.",
+    quote:"\"I'm not certain if this is the exact creature the Greeks were writing about, but it makes sense. It also would explain a lot of flood stories we see throughout history. And why several ages and continents disappeared. If you're ever wondering what happened to Atlantis, why Pangea broke up, or what happened to Old Zealand, we believe now that this is the thing that did it. A lot of what we know comes from the Shrimp people, but it's extremely meticulous and I'm inclined to believe it.\" — George Nichols",
+    excludeTitles:[]
+  },
+  MANIAC:{
+    heading:"⚠ CONFIDENTIAL — MANIAC BRIEFING",
+    portrait:"portraits/Maniac.jpg",
+    desc:"A being of extreme chaos and power. Almost no heroes can stand toe to toe with Maniac for very long, and many who have fought Maniac claim that their body and power withered the longer the fight continued. The survivors are few, but each has come back with severe radiation burns. There have been no bodies of non survivors. Only solution: Full stack high powered cannon, tank, and support teams.",
+    quote:"\"We've beaten Maniac before at great cost. None of our current roster has done it, or at least, not alone. The Flip and The Anchor were on the last team that took down Maniac, but I chalk that up to the silver age glory of Captain Shamrock and Elegus at their absolute prime. On paper, I think several of our top tier heroes can pull it off. Any of our A listers like TCK, The Anchor, and Seraph could do it at fifty fifty, I just think the casualties and destruction are sure to be high regardless.\" — George Nichols",
+    excludeTitles:["The Crimson Knight","The Anchor","Seraph"]
+  },
+  SILPHANA:{
+    heading:"⚠ CONFIDENTIAL — SILPHANA BRIEFING",
+    portrait:"portraits/Silphana.jpg",
+    extraImages:[{src:"portraits/WSPArift.png",caption:"(From left to right: Alexandria Aeros, George Nichols, Cassandra Onik)"}],
+    desc:"An extremely dangerous former senior analyst who has been corrupted by the mace of corruption. She was a normal person, but with that mace she can go toe to toe with just about anyone on the roster (with an advantage against Seraph and TCK). Seraph hasn't been the same since that fight, and that mace is overflowing with the same energy that's been highly effective against TCK in the past. Current objective not known.",
+    quote:"\"She sought order. Alex was always very orderly. She believed in a version of excellence that WSPA simply couldn't meet. We lost heroes, we made mistakes, but we still typically were able to manage and save the world. I know she and Cass had their arguments on method, but I was usually able to get those sorted. Saving the day was never enough for Alex. She and I would talk for hours about how to save the world, how to improve it. She and I recovered the mace on a mission in the middle east where it had been buried in an ancient underground temple. We brought it back to HQ to have it studied. I held the mace, but it never spoke to me. Alex had always been very intense, very straight laced, but after the mace, she was clearly different. Her worldview radicalised, and I think she stopped seeing everyone as worth saving. Our long conversations started to get longer and more heated. She classified me as among the people worth saving, which is why that mace I took to the ribs didn't kill me. She spared me. She didn't spare others, but it's clear that there's enough of her to still care about me. The mace had a hold on her long before she actually wielded it for the first time, and I'm inclined to think a similar quarantine is necessary to save her. I think she might've been my best friend, and I know I was hers. I fear with every passing day that it will mean less to her, because it doesn't mean less to me. We were close. Very close.\" — George Nichols",
+    excludeTitles:[],
+    epilogue:{
+      portrait:"portraits/WSPAgoodend.png",
+      lines:[
+        "\"Director, thank you for everything. This is better than I ever felt I deserved, and I owe it all to you. I intend to propose to George soon. He knows, he just doesn't know when so keep it between us.\" - Lex (AKA the villain formerly known as Silphana)",
+        "\"PS I've been working things over with Seraph. It'll take some time, but I'm doing my best to make things right.\""
+      ]
+    }
+  },
+  LEVIATHAN:{
+    heading:"⚠ CONFIDENTIAL — LEVIATHAN BRIEFING",
+    portrait:"portraits/Leviathan.jpg",
+    desc:"The biblical serpent of the ocean. DO NOT USE TEAMWORK. This creature gets stronger the more people we send, and specifically targets large groups and sweeps them into each other. Estimated length between 60 - 70 meters. 320 - 420 tons. Extremely dangerous.",
+    quote:"\"\"No one is so fierce as to rouse Leviathan.\" Job 41:10. This is the creature that all other creatures are compared against. A monster of immense power and fury. It's a shame it doesn't fight for us. I've got a team running the calculations on who would win between this thing in Typhon. Our hope was that it could be something we piss off as Typhon attacks, and maybe see if these two mythic monsters had a territory dispute over the whole destroying the world thing. Would be a fight for the ages. Hopefully we never find out.\" — George Nichols",
+    excludeTitles:[]
+  },
+  AEROS:{
+    heading:"⚠ CONFIDENTIAL — RECOVERED FILES: SENIOR ANALYST ALEXANDRIA AEROS",
+    portrait:"portraits/Silphana.jpg",
+    isAerosLog:true,
+    logs:[
+      "User: Senior Analyst Alexandria Aeros\n\tIt's not enough. Cass believes we can just bring in anyone. She doesn't understand that she's the reason Bari died. He wasn't ready. When Corvair dies that's going to be on her. This isn't a game, people's lives are at stake. Ali says that this is part of the trade, that I need to cool off, but I think he's just trying to cover for his golden girl Cassandra, the precog who sees enough to get us all in trouble. I just can't take it anymore. We're losing people. We're losing heroes. It feels like the world is falling apart at the seams, like it's corrupting into a state of chaos. George and I have spent a long time talking about the changes we'd make. He's the only one I can talk to. I know he listens, and we try to work through these things, but he doesn't understand. The world needs something to be afraid of. It's clear that the only thing that keeps the world from throwing itself off of a cliff is something to be afraid of, and that's not WSPA. Bad kids are afraid of punishment, not losing a reward.",
+      "User: Senior Analyst Alexandria Aeros\n\tGeorge, I've locked my files. If anyone can break it, it's you. I have the power to save the world now, and I wish I didn't. It means I can't have you. You're going to hate me. That's the point, and I need you to believe it. What I intend to do is evil, it's not morally defensible, but I think it will save the world. Well, their world. Not mine. Mine will continue working along dutifully at WSPA HQ to keep them safe. He will keep working until his bones are ground to ashes.\n\nI'm not going to explain it, but know that what I do has a reason… I love you George."
+    ],
+    georgeResponse:[
+      "Lex? She wrote this for me?",
+      "This changes a lot. It's the mace. We have to get that mace away from her! Whatever it takes!"
+    ],
+    epilogue:{
+      portrait:"portraits/WSPAgoodend.png",
+      lines:[
+        "\"Director, thank you for everything. This is better than I ever felt I deserved, and I owe it all to you. I intend to propose to George soon. He knows, he just doesn't know when so keep it between us.\" - Lex (AKA the villain formerly known as Silphana)",
+        "\"PS I've been working things over with Seraph. It'll take some time, but I'm doing my best to make things right.\""
+      ]
+    }
+  },
+  TCK:{
+    heading:"⚠ CONFIDENTIAL — THE CRIMSON KNIGHT BRIEFING",
+    portrait:"portraits/The_Crimson_Knight.jpg",
+    extraImages:[{src:"portraits/TCKJohn.png"}],
+    desc:"The current champion of Earth. The blade she carries is none other than the blade of Simon Peter. Permanently crimson with blood, it requires the bearer to truly understand Matthew 26:52. As the most powerful hero of today, if she were to ever fall rogue, she would be a tremendous issue. The real threat, however, is if she ever becomes convinced that WSPA is not acting with pure intentions. Perhaps the only thing more powerful than her abilities today is her reputation as a woman of extreme character and courage, and if she begins to speak on a topic, other heroes will absolutely listen. This is a potential threat.",
+    quote:"\"TCK is the hero of today. Full stop. Everyone knows that.\nThe general public knows that Seraph is at an 8.2, The Anchor is at an 8.1, and so is TCK. The truth of the matter is a little different. We let our numbers get leaked from time to time. We over rank the Anchor and Seraph. When there’s a hero in the 8’s, everyone feels a little better. We’ve seen it several times. So we keep Seraph and the Anchor in the 8’s. TCK actually belongs in the 8’s, and is the only modern hero (excluding the alien), who's on par with Elegus and the Shamrocks. The world can’t know that. They need strong figures next to her, but for some reason two 7.9’s lead to increased levels of public fear, so we leave it at 8.1 and 8.2. Their current ratings are their golden age ratings. We elected not to change them despite believing they aren’t correct. TCK is the real deal.\nThere’s something else important about TCK that no one mentions. She knows she’s the real deal, and she knows the responsibilities that come with it. She practices wisdom, strength, and compassion for the world, but she has a private life that is much more curious, tender, and occasionally even immature. She knows that families rest easy because of her, and she takes that very seriously which is why she emphasizes being careful and heroic. The side that her family, her friends, and especially John see is very different. She’s not pretending, I think she just needs a place to recharge.\nShe also happens to be one of the largest threats to WSPA in the world if she wanted to be. When she speaks, everyone listens. Some will scoff, some will furrow a brow, and many will answer her call. If she ever decided that WSPA was not an ethical organization, it would be extremely uncharacteristic of her to sit idly by. The simple fact is she’s probably the only threat here that could get even me to turn on you…\" - Deputy Director George Nichols",
+    excludeTitles:["The Crimson Knight"]
+  },
+  JOHN:{
+    heading:"⚠ CONFIDENTIAL — JOHN DOE BRIEFING",
+    portrait:"portraits/John.jpg",
+    desc:"An extremely powerful alien of unknown origin. Appears to have created his body in order to live among us. He exists on a different scale than we can comprehend, and while his deep value for life has kept him on our side, he is an obvious threat that needs to be watched. His weaknesses are his attachments to his friends. He’s come to really care for Sakura, IceBerg, Shamrock, SkullCrusher, Dinosia, and above all The Crimson Knight. TCK is the key, for better or worse.",
+    quote:"\"The way he talks, you would be forgiven for thinking he’s joking. We thought so too. I remember when Ali and I pulled him in for a meeting. He didn’t mind, he was very polite. Ali asked John to explain why he was on Earth. John responded that he has been protecting sentient and non sentient life for as long as he can remember. We tried to guess how long that might be, and he just shrugged his shoulders. He was so happy to chat with us, it’s a type of simplistic joy that you tend to see on the superheroes who are just happy to be in the game. You know that old saying, the winner is happy they won but afraid of the pressure, second place is sad they lost, bronze is just happy to be on the podium. That’s what I thought we were dealing with. He volunteered to be The Anchors practice dummy. No scratch. Then we watched him take on six massive threats in a single week. No scratch. After the sixth, he flew into space and we watched him disappear with a speed we can’t measure. By then I knew I was wrong about him. He’s a cosmic being. You can trust that everything he says he does, he’s doing, or rather, he’s probably drastically underselling it. He’s aware that what he’s doing is terrifying for us, so generally, he’s trying to minimize it. Our rating capped out at a logarithmic 9.9 because he redefined our scale. He has told us that he’s fought beings more powerful than him, but then again, he won…\" — George Nichols",
+    secondQuote:"ANALYST LOG — Agent Cassandra Onik: I'm not saying he's a bad guy, but an overreliance on John would be catastrophic. TCK is why he keeps coming back, but if that ever changed, I doubt he'd come back as often. He doesn't belong to Earth, he belongs to the galaxy.",
+    secretTrait:"[CLASSIFIED — HIDDEN INFORMATION] If The Crimson Knight goes rogue, John is extremely likely to join her. If the Crimson Knight were to die, John would likely leave for good. | Typhon can deal no more than 50 total damage to John regardless of party size.",
+    excludeTitles:[]
+  },
+  LEGENDS:{
+    heading:"⚠ CONFIDENTIAL — WSPA LEGENDS ARCHIVE",
+    desc:"An archive of the no-longer-active roster, broken out by the age they served. Modern Age losses are logged here for institutional memory. Silver and Golden Age files are being retained in full pending a possible reactivation initiative — for now, only status, real name, power level, and abilities are cleared for viewing.",
+    quote:"\"We all owe a debt to the heroes of yesterday. They fought threats since before any of us were born, they held the line. They got us here. At some point we started keeping records, and it's been our way of saying thank you. In the early days, there were a lot of superheroes. WSPA, or rather, the EDF, was young and unknown. Heroes were doing their best, but usually found themselves on the backfoot entering unknown territory. Most heroes, especially in the golden age, didn't make it very long. It's no accident that the ones who did all knew each other well. The flashier and more lone wolf types only really started to have staying power in the silver age.\" — George Nichols",
+    excludeTitles:[]
+  }
+};
+
+// ─── WSPA ORG CHART (password: WSPA) ───────────────────────────────────────────
+const WSPA_ORG_CHART={
+  director:"Director (Formerly Abbas Ali)",
+  reports:[
+    {title:"Deputy Director",name:"George Nichols"},
+    {title:"Special Advisor",name:"Cassandra Onik",note:"(Former Special Operations Senior Analyst)"}
+  ],
+  analysts:[
+    {title:"Former Special Operations Senior Analyst",name:"Alexandria Aeros",note:"(Now Rogue)"},
+    {title:"Special Operations Analyst",name:"Adam Chris"},
+    {title:"Special Operations Analyst",name:"Neela Deepak"}
+  ],
+  departments:["Special Operations Department","Tactical Response Department","Human Resources","Information and Innovation Technology Department","Finance Department","Supply Planning Department","Public Relations Department"]
+};
+const WSPA_NICHOLS_BRIEFING="\"I'll continue to cover the covert operations while you cover the public facing hero work. We've been staying ahead, but there are four clear subterfuge threats to our ability to maintain peace. Division 7, Division 8, The Accelerationists, and the GGRU. I've got assets in the right places, and I'll do my part to try and avoid any major meltdowns. That's always been the arrangement, you save the world, I keep you covered. I should be able to get you plenty of insight before things get hot. Losing Aeros is a big issue, but adding on Agent Deepak has really alleviated the hole Aeros left behind. Deepak and Chris make for an excellent duo, and Cass has still been helping where she can. I wanted to discuss with you about bringing on another analyst or two and promoting one up to senior that will actually stick around this time. I didn't think it would be this hard of a role to keep filled. Who knows, maybe Franco wants the job? (just a joke). I know Aeros and I were particularly close, she was a very dear personal friend and even a mace to the rib won't change that I care for her but I won't let that get in the way of my duties. I know she needs to be stopped, and I believe that if we separate her from that mace she'll go back to being the hyper rational and very honest woman that I remember so dearly.\"";
+
+// ─── CAREER ───────────────────────────────────────────────────────────────────
+const CAREER={beginner:{mult:1.0,label:"BEGINNER",next:"intermediate"},intermediate:{mult:1.05,label:"INTER.",next:"veteran"},veteran:{mult:1.11,label:"VETERAN",next:null}};
+function xpToLevel(h){return h.baseHP;}
+
+// ─── PRIORITY ─────────────────────────────────────────────────────────────────
+const P_ORDER=["yellow","orange","red"];
+const P_LABELS={purple:"SUPERVILLAIN",red:"PRIORITY ONE",orange:"DANGEROUS",yellow:"LOW"};
+const P_COLORS={purple:"#aa44ff",red:"#ff3333",orange:"#ff7722",yellow:"#ffdd00"};
+
+// ─── TUTORIAL: characters & scripted threats ───────────────────────────────
+// Nichols' portrait path is a placeholder — drop an image at this path and it will render automatically.
+const TUTORIAL_CHARACTERS={
+  nichols:{name:"George Nichols",title:"DEPUTY DIRECTOR",portrait:"portraits/George_Nichols.jpg"},
+  cassonik:{name:"Cassonik",title:"",portrait:"portraits/Cassonik.jpg"}
+};
+const TUTORIAL_THREAT_1={id:9001,name:"The Inclusive Bank Robbers Guild",loc:"Local Branch, USA",lat:39.0,lng:-95.0,priority:"yellow",type:"military",desc:"A cheerfully egalitarian gang of amateur crooks is attempting to rob a small local bank. WSPA's threat assessment rates this about as low-stakes as it gets — but every mission counts, Director.",maxTimer:9999,reward:5,tutorialGuaranteed:true};
+const TUTORIAL_THREAT_2={id:9002,name:"WSPA Heroes Of Tomorrow General Assembly",loc:"WSPA HQ",lat:38.9,lng:-77.0,priority:"yellow",type:"military",desc:"A gathering of young hopefuls awaiting a few words of inspiration from the roster. No combat required — just a bit of public speaking.",maxTimer:9999,reward:5,tutorialGuaranteed:true};
+const TUTORIAL_THREAT_YELLOWSTONE={id:9003,name:"Yellowstone Supervolcano",loc:"Yellowstone National Park, USA",lat:44.6,lng:-110.5,priority:"red",type:"kaiju",desc:"A quaternary volcanic field capable of mass devastation. Has been dormant for some time…",maxTimer:240,reward:5,tutorialGuaranteed:true};
+function escalate(p){const i=P_ORDER.indexOf(p);return i>=0&&i<P_ORDER.length-1?P_ORDER[i+1]:p;}
+
+// ─── SHOP-LOCKED HEROES ───────────────────────────────────────────────────────
+const SHOP_LOCK_TITLES=["Greywulf","Pyrexa","Seraph","Big Mack","Scarlett","Corvair","Dr. Voidance","Mycenzo","The Conductor","Shadowmere","Special Operations Strike Team G","Artemis","Aurora"];
+// Heroes locked until their Heroes of Tomorrow scene is completed (see #4 / #9 of the update scope)
+const HOT_LOCK_TITLES=["Captain Shamrock","Skull Crusher","The Dragon of the Daimyo"];
+const SHOP_VILLAIN_TITLES=["The Vicountess","Dr. Stinkenstein","Hydrotheppilies","Professor Cyanide","Chelikere","Kinetica","Quaker","Bathsheba","Asmodeus","Tōyu"];
+const SHOP_PRICE=200;
+const SHOP_VILLAIN_PRICE=100;
+
+// ─── CATCHPHRASES Once On Hero roster ─────────────────────────────────────────────────────────────
+const CP={
+  "The Crimson Knight":["I honor faith and the fallen!","Inconvenience is no excuse to not practice virtue.","Through the valley of death, I fear no evil.","Ad Majorem dei Gloriam","Fine, I'll take out this bad guy but I have a date in 10 minutes","Sanctus Dominus Deus Sabaoth","Come friends. We have people to save!","The potential of a blade to cut does not make it evil. Much the same is man.","In life we fight evil. Be assured by it's inevitable defeat.","In all hearts is the beauty of tenderness and love. Never forget this.","Truth is not to be defended, but unleashed.","I am not afraid. Fear is natural, but nothing in the face of love.","I have a crush on John.","Every soul is worth protecting. Every single one.","Saving people is important, both physically and spiritually.","Amo Ioannem... Shhhhh"],
+  "The Sportsman":["Game on.","I love my wife!","Champions adapt. I should know!","This calls for a combination of my archery, gymnastics, and grappling skills!","You should've seen what I did to The Flip!","Current Martial Arts world champion right here! Yes I know Supers can't compete...","Peanuts are the only thing that scares me.","I've trained for every sport — including this one."],
+  "Morgana":["Magic is just medicine with better effects.","I've healed worse.","My husband and I will kick your ---.","It's not easy balancing my career and hero work.","If anyone hurts my husband I'll turn them into a newt.","Why does everyone keep calling me Blair?","According to my husband I'm a GOAT and that's a good thing! So Suck it!","Even witches have office hours.","Stay behind me."],
+  "IceBerg":["Cool as ever, brother.","Stay frosty — literally.","God first, ice second.","Chillax friends... The Ice King is on it.","I'm worried about The Flip...","Some like it hot. Not me personally, but some do...","Ice on my wrist, and arms. And shoulders. And.. well...","Antarctica isn't so bad if you're immune to freezing... Who am I kidding, it's windy too.","Heat me up, I dare you.","I don't make the rules, but I do enforce them"],
+  "The Flip":["I'd rather be digging.","Titanium skin, iron patience.","I'm still unused to not being the most powerful person in the room","I do this under protest.","Another day, another paycheck for my excavation.","No one asks about my most recent publication.","I'm quite annoyed that I'm a better hero than researcher.","I'm too old for this.","Don't make me teleport you somewhere unpleasant."],
+  "Cassonik":["I already saw this coming, partially.","My contacts with their millitary will come in handy.","The odds are in our favor. Barely.","Don't panic.","Don't worry, I already thought through this.","Alexandria and I talked about this once.","I know what happens if I fail. I won't allow it.","I've seen our wins and losses, past and future. Daxmious, Carrigan. We can win!"],
+  "Mycenzo":["My stone skin has never broken.","The battle of the flesh is no match for that of the soul.","The Vatican trained me for worse.","Loyalty is its own armor.","Stand still. I'll handle it.","Very well.","I don't chip easily.","I hate how ubiquitous the media is."],
+  "Pyrexa":["HAHAHAHA — oh wait, am I on fire again?","Fire solves most problems.","Is it hot in here or is that me?","More collateral damage? Probably fine!","I think I'll turn up the heat in here.","Me, I'm the one that likes it hot.","The journos say I'd beat most other heroes in a fight. Well, Most...","Let's turn it up!"],
+  "The Conductor":["Sound travels faster than you think.","Calibrating…","Ears open. Everything else shut.","Resonance achieved.","Let me knock the socks off em","Why does the media keep trying to pair me with heroes... They keep getting it wrong too...","I'll hit every frequency until something breaks."],
+  "Greywulf":["Don't call me Fido.","I track. I hunt. I finish.","Full moon or not, I'll manage.","My Culture is not your fanfiction! Gross!","The wolf remembers every trail.","The Day I got bit was terrible. The days when I can save others make it worth it.","Don't touch my ears."],
+  "The Anchor":["I have stood through centuries. You will not move me.","The earth holds still. So do I.","Patience is the warrior's greatest weapon.","Come. I am not going anywhere.","I am not afraid.","I have seen worse."],
+  "Dr. Voidance":["Which dimension am I in? Doesn't matter.","Pocket reality: deployed.","The void is my home.","Phase-shifting engaged.","Just don't send some boyscout with me...","I don't think the media really understands my powers at all...","I have seen things you people would not believe...","Earth is definitely worth saving. I've seen our other options","Hold on — I need a moment in dimension 4B."],
+  "Ironside":["Command aura: online.","Fall in line or fall behind.","Strategic deployment: confirmed.","The armor has never failed me.","Semper Fi.","I do not lay my world in foreign hands.","Of course I plan contingencies","Victory Beers on me.","The warrior balances peace through strength.","Mercy can work. But don't pretend it's not reckless.","This is not my first engagement."],
+  "Shadowmere":["You didn't see me.","Shadows remember everything.","In and out. No one notices.","Silence is my preferred weapon.","I'm already there.","I'm starting to like being on a team.","You trust me? Really?","People can change... I have to believe that.","The dark doesn't scare me — I own it."],
+  "Seraph":["I have seen your kind struggle before. You will persevere.","Light endures.","Even fallen stars leave light behind.","Do not be afraid. I am here.","All things matter. All things are important. From the smallest worm to the greatest star.","The celestial record will reflect this day."],
+  "John":["Yeah, I've got this one.","I've seen worse on my home world.","Let me try and talk it over first, if that doesn't work have at it.","Can I listen to music during the fight? I didn't have this where I'm from.","I like this planet.","Let me try talking to them first.","I played a game like this back on my planet","I have a crush on the Crimson Knight.","I love getting to work with people.","I prefer resolution over violence. Usually.","I get scared sometimes too…","If one fails when trying to do good, he's no failure…","Sometimes I see what they write about me, I just want to help…","Alright I'll help, but I have a date in ten minutes.","I made this body from scratch, what do you think?"],
+  "Adrenaline Junkie":["Okay fine — this is fun. A little.","Electric! And not by choice.","Let's just get it over with.","I'm only here because The Flip asked nicely.","I love listening to the media fight panels. I just think they under rank me.","I've been spitting facts since 2017.","I could totally take Ice Berg in a fight. Just not in the ocean or Antarctic or Arctic...","Charged up."],
+  "Captain Shamrock":["For Ireland and all that!","The shield holds!","Every hero goes home on my watch.","The Shamrock never wilts!","Styles says I can do this!","Definetely don't send me with Dr. Voidance. That would be terrible!","Third in a lineage is hard.","The Original Captain Shamrock was much stronger than me..."],
+  "Hydrothylre":["Nobody appreciates a fish king.","I hate the surface. So dry.","Jean Pierre Shrimperson does not lose. Not today.","I'm doing this for the Shrimpersons.","You know, by technicality, I'm among the wealthiest beings on the planet...","My grandfather Jordan Percival Shrimperson beat The Anchor in a fight once! Yes, he went by JP...","In the ocean I am magnificent."],
+  "Dinosia":["I trained my raptor form for this!","RAWR — that was professional, I promise.","My van has better intel than your HQ.","Science and dinosaurs. The perfect combo.","Dinosaurs are cool as a child, they're cooler as an adult.","A lot of studios ask me to star in their dino movies now!","No one suspects the corvid form","I've been looking for an opportunity to flex my ankylosaur form...","Did you know velociraptors had feathers?","I'm still kind of overwhelmed that I work with people I... nevermind...","My paper is getting published!","A dragon princess just added me to a groupchat with the two most powerful beings on earth to gossip? And they're cool!","My paper is getting published!","I didn't understand the GOAT debate until I got rated top 10 once. Hearing someone appreciate my skills made me happy...","Stopping villains is easy. Working with the people is a little... overwhelming?"],
+  "El Infinite":["This is perfect material for my thesis!","I'm the most qualified person here, statistically.","Does anyone else smell academic greatness?","Wait — is my contribution being tracked?","I've already drafted the abstract in my head."],
+  "The Gummy Bear":["Nobody gets hurt on my watch.","Gelatin: nature's armor.","Soft on the outside, harder to kill than you'd think.","Victory ice Cream is on me!","My buddy Mack and I have been training for just this occasion","Would anyone like ice cream after this?"],
+  "Titanaboa":["Sssso many prey…","The hunger guidesss me.","Constriction isss communication.","I wasss a sscientist once.","I'm starting to overcome my instincts. This is amazing...","Maybe I can do good..."],
+  "Ariadus":["The web never liesss.","Eight eyesss see everything.","My web, my rules.","The sssspider does not apologize.","I'm starting to overcome my instincts. I can be human again!","I've found a way to balance the instincts together...","Sskittering is underrated."],
+  "Maniac":["DESTRUCTION.","Burn it. All of it.","CHAOS FIRST.","Nothing matters. Everything ends.","Order is the enemy."],
+  "Silphana":["The Mace hungers.","I was once like you.","The world will go dark eventually. Darkness is not evil. It is reality.","I am aware of the complexity of life.","Darkness and evil are not synonymous","Few wish to dance with my mace. Fewer would ever see light again."],
+  "Niera":["Disappoint me. I dare you.","You're either useful or you're in my way.","Standards exist for a reason.","I fight harder than I judge. Barely.","I live by my rules. I do what I want.","I'm less concerned with my fight rating and more with my PR","There is a rumor about me that simply isn't true. I won't say it, but spread it at your own risk.","Impressive. Don't let it go to your head.","I don't need help! Though John or The Crimson Knight would be cool to work with."],
+  "Argos":["Money is power. Power is everything.","My suit cost more than your country.","My lawyers are faster than you.","Mediocrity is so... peasant.","Exquisite. As expected.","Parry this peasants.","Imagine Being poor. Er.. Sorry. I'm working on it."],
+  "Scylla":["A thousand years of rage.","I miss my people.","I yearn for a people to call my own again.","My heart has been hurt, but perhaps I can open it once more.","You are nothing but another name on my list."],
+  "Golgotha":["Art is eternal. Unlike you.","I've seen shrimp fight better than this.","My clade has existed longer than your civilization.","Refined, as always.","I have watched empires collapse with more grace."],
+  "Mrs. Peanut":["THEY WILL PAY FOR WHAT THEY'VE DONE TO US.","Every jar… every tin… I remember.","Allergy season has never been so personal.","Don't call me nutty","No mercy. None."],
+  "Chupacabra":["El Chupacabra no perdona.","The hunt never ends.","They run. I am faster.","Soy el toro, soy el monstruelo.","I can smell when blood curdles","Fear me."],
+  "Swirrlous":["The planet deserves better!","I am trying to save the world. It's just complicated","I might have been a little extreme, haven't I?","Don't cut down trees near me.","Illusions hurt no one. Unlike you people."],
+  "Big Mack":["Ready to hit something.","Simple problem, simple solution.","I swear I'm the funniest guy on the roster","I'm the wrecking ball.","Don't overthink it.","My name is in lights. I know I'm the man.","They don't know me.","I called in to a talk show today. They've got me top 5 this week.","Let's go."],
+  "Scarlett":["You're not sure who I am. Good.","I can be anyone I need to be.","Team player. Always.","Leave the recon to me.","You might not recognize me next time."],
+  "Corvair":["Hi! This is so exciting!","I believe in all of you!","I'll bring water and snacks!","Everything is going to be great!","I've got bandaids in my fanny pack!"],
+  "The Dragon of the Daimyo":["YAAAAS let's GO!","You see that? Yeah? That's ten thousands viewers watching me save the day","Dragon mode: unlocked!","I practiced this transformation for weeks.","Chat, clip this.","The character arc is so real right now.","My ancestors are SCREAMING right now and it's for the right reasons!","Okay but my dragon form is literally so aesthetic.","Tell me I'm not the main character. I dare you.","I'm going to do a little victory dance whether you like it or not.","Watashi wa doragon da","No no no, hold on — I need to pose for the cameras first.","You should've seen my mom's dragon form...","My mom is going to see this and she's going to lose her mind.","Time for a team up episode! Hope my best friends can be there!","The comments are going to go INSANE for this one.","Otousan no tame ni, okaasan no tame ni!"],
+  "The Vicountess":["Knowledge is the only currency that matters.","My family comes first.","This is fascinating, from a scientific perspective.","Blood alchemy is just chemistry with flair.","I'm not cruel — I'm curious."],
+  "Dr. Stinkenstein":["Hm. I think I can make that stinkier.","Science of the disgusting variety.","My wife says I need a hobby. This is my hobby.","Weapons of Mass Disgusting. I'm proud of that name.","The nose knows."],
+  "Hydrotheppilies":["We are NOT jokes.","The ocean has more heroes than your history books admit.","K.B. Shrimperson does not yield.","Don't call me the knockoff.","My cousin and I can take on any threat across most of the planet. That's not weak!","The aquatic world will have its recognition."],
+  "Blink":["Everyone keeps comparing me to my dad. He was a lot stronger... A lot.","Light moves fast. So do I.","Don't blink...","You'd be shocked what strobes can do..."],
+  "Skull Crusher":["I'm trying to be careful. I really am.","John told me I could do this. I'm choosing to believe him.","I can do this. I can do this. I can do this.","Strength without control is just a disaster waiting to happen. I know that better than anyone."],
+  "Eclipso":["I could be tending my garden right now.","I showed up, didn't I? Don't push it.","I care. I just express it differently.","Can we get this moving along?"],
+  "Tremor":["I just need to take a moment to concentrate.","I can tell working with some heroes is going to be a lot harder than others...","The Earth listens only when I sing, not shout.","Pyrexa said I could do this. I trust her."],
+  "Chelikere":["Send your best. I'll send them back.","One on one, baby!","You see these muscles baby?","I'm a big dog! I've got big dog status."],
+  "Kinetica":["Pain is just stored energy. And I store a lot.","It's about how hard you can get hit...","Some people are interesting. Most aren't.","Hit me harder. I'm serious."],
+  "Quaker":["I'm working on it. Truly. I am.","I am trying so hard not to hurt anyone.","Lord grant me steadiness. Any steadiness at all.","If the ground shakes, that's on me. I'm so sorry."],
+  "Dr. Destruction":["I fought the original Captain Shamrock at 19. I got smoked. But still fun!","EVOL was my idea. I stand by it. We never hurt anyone.","I just like having something to do on Tuesdays.","I trapped Elegus in a liquid rubber trap once. The Anchor and Captain Shamrock saved him, but still I did it!"],
+  "Smokescreen":["Darling, you never stood a chance.","Where there's smoke there's fire.","I think I'll turn the heat up in here...","Don't choke sweetie, it's bad for your jawline."],
+  "Professor Cyanide":["My new synthesized batch should handle this.","I've liked getting to work with other academics on the team...","I used to think the world was dark. Someone showed me otherwise.","Fine, this is warming my heart. Darn it."],
+  "Special Operations Strike Team G":["Strike Team, on my mark.","Over and Out.","Copy.","Lock and Load.","I'll bring my best operatives."],
+  "Artemis":["Don't touch me!","This is why I prefer remote work!","I think I'm getting the hang of this.","I haven't had a hug in years…"],
+  "Aurora":["I don't understand anyone. You talk too slow.","Hurry up already!","This could've been a text message."],
+  "Bathsheba":["I took the easy way. Now it's time to fix things.","Technology can be magical…"],
+  "Asmodeus":["Is that all?","Dark is the night.","Go ahead. Show me how angry you can be.","So uncreative.","I don't ask twice.","The devil doesn't have horns. He wears a sharp three piece."],
+  "Tōyu":["Oboreru.","Seigi no kōsei-sa.","Bōryoku ga watashi no kyōshidatta.","Would… Would I be permitted to join in mission success festivities?"],
+};
+const JOHN_DEPARTURE_QUOTES=[
+  "I've gotta go help out somewhere else.",
+  "Be right back.",
+  "The Crimson Knight told me I need to do good, so I'm going to go help the Gemumbians.",
+  "The Orions need my help!",
+  "Baglarion the Sun Destroyer needs to be stopped before he finds the Axe of Galaxial Destruction!",
+  "The Mijishi World needs my help!",
+  "The Cloxian dimension needs me to help keep it from self erasing.",
+  "The Cloxians need my help!",
+  "I'm going to pick up a special token of my love for The Crimson Knight back home!",
+  "The Flabermians need my help!",
+  "The Coagulanians are in trouble. I'm going to go help them!",
+  "A stellar nursery is currently running low on nitrogen. I'm gonna go help out.",
+  "A cybernetic hive mind is trying to assimilate the Acklovians. Gotta go stop it.",
+  "A continuum of pretend omnipotents are being mean to a young planetary system.",
+  "I need to go isolate and decontaminate the milokyde galaxy. Can't risk the Nullus breaking containment...",
+  "My friend on Caxus needs a hand.",
+  "The Halluxians got into a war with the Enginians and the Tiploplians. I need to broker peace.",
+  "I'm going to go pick up my favorite Ice Cream on Malxinaria Prime. I'll be right back…",
+  "A pregnant space whale will die if I don't perform surgery. Millions will die if she does. I'll be right back!",
+  "I need to go push a Type 3 civilization out of Ton 618s Event Horizon",
+  "A purple guy is trying to kill half the population of the universe. I gotta go intervene. Be right Back.",
+  "A supernova is about to hit the Caldosian Federation. I've gotta stop it.",
+  "I must go stop Dacernus before he reaches this solar system!",
+];
+
+const JOHN_GRIEF_QUOTES=[
+  "I'll never forget her…",
+  "I need some time to process this…",
+  "………………………………",
+];
+const CK_JOHN_DEPARTURE_RESPONSES=[
+  "See you later, alligator.",
+  "Don't be gone for too long! I have tickets for us to see that new superhero movie!",
+  "Don't get into too much trouble, Spaceman!",
+  "Tell the aliens I say hi!",
+  "Bring me back another souveneir. I loved the Talmonian wine!",
+  "I'll hold down the fort while you're gone, handsome.",
+];
+
+// ─── NEWS SOURCES ──────────────────────────────────────────────────────────────
+const NEWS_SOURCES=["The Guardians","Heroes Weekly","Villain Watch","Life and Death Magazine","The Heartthrob Weekly","Gust the Facts","The Franco Show","Golden Age","On the Field"];
+
+// ─── NEWS HEADLINES ───────────────────────────────────────────────────────────
+const HEADLINES={
+  villainDefeatsHeroes:[
+    "Y defeats Earth's strongest heroes!",
+    "Y thwarts our beloved protectors!",
+    "Defenders stalled by ruthless and cunning Y!",
+    "Y comes out on top!",
+    "Can anyone stop Y?",
+    "Y is mere moments from conquering the world!",
+    "'Why Y conquering the world isn't such a bad thing.' — Written by Definitely Not Y",
+    "Top 10 'Hear Me Out's' — #1 is Y",
+    "Y just embarrassed the best we have to offer!",
+    "Who is managing these heroes?",
+    "Generational fumble!",
+  ],
+  threatDefeatsHeroes:[
+    "Natural Disaster bodies superheroes!",
+    "Z eeks out victory over beloved heroes!",
+    "Does Z have a point?",
+    "Why Z is overrated…",
+    "I for one welcome my new Z overlords",
+    "Our heroes can't even defeat Z?",
+  ],
+  heroDies:[
+    "Rest in Peace X, You will be remembered.",
+    "X saved me, now they're gone… A biopic.",
+    "A funeral ceremony for X.",
+    "The President of the United States honors X at memorial.",
+    "Why X was my favorite hero. — A young boy's story.",
+    "Why X was my favorite hero. — A young girl's story.",
+    "Why X was my favorite hero. — An old man's story.",
+    "Why X was my favorite hero. — An old woman's story.",
+    "The President of North Korea Calls US President to offer Condolences over X.",
+    "The President of Russia Calls US President to offer Condolences over X.",
+    "The President of China Calls US President to offer Condolences over X.",
+    "The President of India Calls Pakistani President to mourn X.",
+  ],
+  heroesWinNoRel:[
+    "X and X team up to stop Y!",
+    "X and X save the day!",
+    "Who did more work, X or X?",
+  ],
+  heroesWinDisdain:[
+    "Who needs enemies when X and X have each other?",
+    "Why X is really better than X, an opinion.",
+    "Can we normalize X being better than X?",
+    "We all know X carried X.",
+    "Someone fire X from the team before they get X killed!",
+    "I stan X, not X.",
+    "Why those damn teens need to stop whining about X being better than X. Get over it.",
+  ],
+  heroesWinRomantic:[
+    "The Power couple, X and X, save the world!",
+    "X and X show us the power of love!",
+    "Why shipping X and X is giving hopecore!",
+    "Love, power, and heroism. What more could X and X want?",
+  ],
+  heroesDevelopRelationship:[
+    "Super spice? X and X seen holding hands after battle.",
+    "Naughty hero work? The secret life of X and X.",
+    "The secret lives of our Heroes — X and X.",
+  ],
+  johnRedeemsVillain:[
+    "John shows us no one is beyond saving.",
+    "Can we trust Y to do good?",
+    "Hopecore MadLad!",
+  ],
+  johnStopsVillainOrThreat:[
+    "John might be that guy.",
+    "This guy better never go evil…",
+    "Why The Crimson Knight and John's relationship is saving the world.",
+    "Is this the hero of the future?",
+    "The Golden Boy from far away…",
+    "We just learned that there's levels to this hero work.",
+    "Who is John?",
+    "I swear John is overrated… Even after this.",
+  ],
+  johnLeavesToOtherPlanets:[
+    "Who will step up to protect us?",
+    "Who could beat John in a fight?",
+    "Will any villains start something with John gone?",
+    "Top five team ups that could give John a run for his money.",
+    "Why literally no team up could match John and The Crimson Knight.",
+    "Crimson Knight not worried about John after months of disappearance.",
+    "The Crimson Knight is more okay with John being gone than I am! An Opinion Piece.",
+    "The best ability is availability. Why John can never be the GOAT",
+    "Poll demanding for John's citizenship to be withdrawn increases.",
+    "NSFW Fanfiction community more devastated than Crimson Knight over John's departure.",
+  ],
+  heroWinsSolo:[
+    "X triumphs again!",
+    "Can X be stopped?",
+    "Forget teams, X has got our backs!",
+    "X showed the world what heroism looks like.",
+    "Honestly, who else do we need beside X?",
+    "X kinda embarrassed their teammates today…",
+    "Former Hero Elegus says X is the type of hero the world needs more of.",
+    "WSPA who? X is talking.",
+    "Right Person for the mission.",
+    "X got lucky!",
+    "X, the brave and the bold.",
+  ],
+  generic:[
+    "X vs Y, who would win?",
+    "We asked our audience their favorite ships, the top answer? X and X.",
+    "Which heroes could beat X?",
+    "Survey says this one supervillain could only be beaten by X.",
+    "Is X overrated? Our answer… It depends…",
+    "X or X? Why it's not close.",
+    "My teenagers won't stop raving about X.",
+    "Is X a psyop to convince young men to distrust society?",
+    "Is X a psyop to convince young women to distrust society?",
+    "Why liking X makes you a psychopath and liking X makes me cool.",
+    "Why Y is kinda hot, and I'm tired of pretending they're not.",
+    "Stop shipping Y with X! I can't keep liking all of this fanfiction!",
+    "We asked 30k die hard fans who the hottest hero was. Their answer? X.",
+    "Burning Love: The fanfiction of X and X that has tens of thousands of views.",
+    "Enemies to lovers: Why millions ship X and Y.",
+    "My child just told me they want to be like X when they grow up.",
+    "Small Earthquake in the North Pacific.",
+    "Hero X caught listening to their own biopic on audiobook.",
+    "Discovering X: A hero's journey to finding themself.",
+    "X isn't in my top 5. I'm tired of pretending otherwise.",
+    "The Top 3 conversation is John, X, then X, and ya'll aren't ready for that conversation.",
+    "I think we all know X is carrying the team.",
+    "X is a diva. There I said it.",
+    "Franco's Top 5 starts with X, and he has a point.",
+    "Former Hero Weighs in on current top 5, his list starts with X.",
+    "Second Captain Shamrock says X is the hero to watch right now.",
+    "Second Captain Shamrock explains why Kimiko's Dragon Of the Daimyo was an honorary Silver age hero, and a pleasure to work with.",
+    "The rookie to watch? X",
+    "Fight breaks out on Hero Podcast as classic X vs X debate continues.",
+    "The Franco Show lists top underrated heroes. X leads the list.",
+    "If I were in charge I'd cut X today. Not a leader to the team.",
+    "If my life is on the line, I need the top 5 to save the planet. I'm taking John, X, X, X, and X. I said it.",
+    "Five heroes to beat Y, who are you taking? Why my team isn't complete without X.",
+  ],
+};
+
+// Generic idle headlines — fire when no event-driven headline has populated for 10+ seconds
+const GENERIC_IDLE_HEADLINES=[
+  "WSPA HQ confirms no comment on recent hero drama.",
+  "Poll: Which hero would you most want to have coffee with?",
+  "Civilians report seeing a very fast blur near downtown. Probably fine.",
+  "Local man insists he could have handled it himself.",
+  "WSPA Director rated #1 most stressful job on Earth for the 4th consecutive year.",
+  "Op-ed: Why we should all be nicer to supervillains.",
+  "Dinosaur Researchers paper accidentally identifies fraud in colleagues research. Why she's unapologetic about defending the integrity of Academia.",
+  "Scientists baffled by uptick in cryptid sightings globally.",
+  "Hero merch sales at all-time high — economists baffled.",
+  "Are our heroes weaker than they used to be? From Hughes to Elegus to TCK",
+  "Heroes aren't weaker now. They're just not dying on rookie solo missions like they did in the Golden Age.",
+  "Lizard People offer new tourist destination underground. Why it's not much to see...",
+  "How Mentorship has changed the WSPA culture.",
+  "The Legacy Of Abbas Ali. The man who held together the Silver Age.",
+  "Astronomers admit they just witnessed the most legendary space battle of all time outside of solar system. Quote: 'You wouldn't even believe it bro.'",
+  "Wealthy, happily married, successful pillar of his community explains why he now needs to take up underwater cave diving in cave labelled 'guaranteed death of cave divers' cave.",
+  "Beloved hero brings back strange Ice Cream From Other Galaxy",
+  "WSPA confirms: no, you cannot intern here. Stop asking.",
+  "WSPA employee caught releasing confidential information to Video game company, their reason? To make it more realistic",
+  "Hero caught using superpowers to win video game contests.",
+   "Sentient Horse Shoe Crab People identified off the coast of New England. Sentience came surprisingly recently. They're very sweet...",
+  "WSPA releases footage of drunken man trying to lift Hammer of 1000 Moons.",
+  "Hero Couple caught making out on Mars by Rover and 500 scientists...",
+  "Support group for civilians caught in hero battles gains record membership.",
+  "New documentary on WSPA field operations greenlit by major studio.",
+  "Indie Documentary crew in hot water for not stopping villain they were making documentary about.",
+  "Anchors Aweigh, how one man withstood centuries.",
+  "Alien Race called Tolicians offers gratitude to Earth after hero saves their Mother Spawn",
+  "Franco says Anchor is not legendary -- 'He lost to Troxis, Daximous, even Jordan P. For a career this long I should be able to list some wins. Stop calling that man legendary.'",
+  "Franco visibly winces as guest calls Seraph The GOAT",
+  "Reminder: if you see a glowing crater, do not go near it.",
+  "Geologists note unusual seismic activity. WSPA says it's 'being handled'.",
+  "Franco explains why villain GOAT debate is more interesting than Hero GOAT Debate",
+  "Fan site ranking every WSPA hero by 'huggability' goes viral.",
+  "New Dragon TV Show debuts season to fantastic acclaim. How an alien made even the doubters see her heart.",
+  "Dragon merch sells out in minutes.",
+  "Dragon TV Show wins Emmy after protagonist and friends save Emmy Awards show.",
+   "'Sakura's not even the most powerful hero in her family' -- Franco explains why Sakura is nowhere near GOAT debate",
+  "Anonymous tip suggests at least one WSPA hero has a podcast.",
+  "Civilian shoots their shot with rescuing hero...",
+  "Dragon TV Show episode airing John TCK kiss overloads networks.",
+  "John explains game from home on Sakura's stream. 'Like your soccer. Except you can use your hands. You can't hold the gem. And there's no field because we put the goals on opposite sides of any given galaxy.'",
+  "Why WSPA has difficulty operating in the Balkans",
+  "Supervillain guild groupchats leaked. They were debating Superhero GOAT debate.",
+  "Former Captain Shamrock says hero work starts with getting your vegetables, ends with getting good rest.",
+  "Elegus, the Man, the Myth, The Hero who defeated Cariggan. A biopic",
+  "The Lineage of the Shamrock. The complexity of the inheritance. Why Styles says it's not easy to be the man in green.",
+  "Styles seen at WSPA headquarters training Morris",
+  "Styles and Mikonos seen training new batch of heroes.",
+  "Earthquake attributed to hero training. Heroes say they will practice elsewhere.",
+  "Elegus and Former Captain Shamrock seen at World Cup Event together sharing a beer.",
+  "Superhero commentator Franco invites Styles Captain Shamrock to discuss GOAT debate",
+  "Elegus explains why it's so hard to answer Silver Age GOAT Debate, but easy with Golden Age",
+  "The Shrindex, the shrimp stock market, rises 6% as global dentistry increases.",
+  "Shrumpply and Demand. Why the Shrimperson Wealth is so undesirable to the surface world.",
+  "Frigid Waters. Why the largest battle in history was fought between mermaids and shrimp underwater.",
+  "New Study reveals Shrimp Dynasty is oldest civilization on earth, starting in the Jurassic Era when Shrimp people developed intelligence to hone underwater cleaning and dental practices.",
+  "The Shrimp that struck back. How Jordan P. Shrimperson managed the legendary feat of knocking out the Anchor.",
+  "Cinderman, Styles Captain Shamrock, and Elegus reminisce on top saves over the past forty years.",
+  "Golden Age Versus Silver Age? What's the difference?",
+  "Trekken, Wildcard, Magnetrix, Jordan P. Shrimperson, Lamentia. The Biopic on the Golden age heroes who fought alongside Hughes Captain Shamrock, The Anchor, and Seraph.",
+  "Elegus and Styles Captain Shamrock. THe men who defined the silver age of heroes.",
+  "Silver Age Versus Golden Age. Who would win? Where does the Anchor Fit in?",
+  "Silver Age Heroes reunion at Elegus Manor in Greece. Attended by The Anchor, Seraph, Styles Captain Shamrock, Cinderman, Luminia, Corouson, and James P. Shrimperson. The Flip",
+  "Strange loves, how a Knight and an Alien fell in love.",
+  "Heroes caught at Football game holding hands...",
+  "Former Hero Cinderman admits beef with Styles Captain Shamrock. Says two fought three times, one of which came to blows outside of Irish pub.",
+  "Hero found at residence of famous Actress. Two say they are just friends...",
+  "Hero found at residence of famous Actor. Two say they are just friends...",
+  "I'm Sick of Alien Invasions. Yes even the benevolent ones.",
+  "Silver Meadows HOA threatens to steal Russian Millitary Technology to defend neighborhood.",
+  "Rumors of Mysterious AI Execution Robot designed to murder heroes abound.",
+  "Property insurance premiums rise for the 12th straight quarter.",
+];
+
+function pickHeadline(type,heroes,villainName,threatName){
+  const pool=HEADLINES[type];
+  if(!pool||!pool.length)return null;
+  let h=pool[Math.floor(Math.random()*pool.length)];
+  const heroNames=heroes.filter(x=>x&&x.title).map(x=>x.title);
+  const src=NEWS_SOURCES[Math.floor(Math.random()*NEWS_SOURCES.length)];
+  // Replace X placeholders with hero names
+  let i=0;
+  h=h.replace(/\bX\b/g,()=>heroNames[i++%heroNames.length]||"our heroes");
+  // Replace Y with villain name
+  if(villainName)h=h.replace(/\bY\b/g,villainName);
+  // Replace Z with threat name
+  if(threatName)h=h.replace(/\bZ\b/g,threatName);
+  return `[${src}] ${h}`;
+}
+// ─── PUBLIC RELATIONS PANEL ────────────────────────────────────────────────
+const CASSONIK_TIPS=[
+  "Pro tip: Deploy in teams of four, that way you don't get blindsided if a mission goes south.",
+  "Make sure to heal up resting heroes.",
+  "Leveling up heroes to veteran unlocks critical abilities.",
+  "Heroes that disdain each other are less likely to succeed.",
+  "Different threats require different deployments.",
+  "Stack heroes that have synergy.",
+  "I asked out the Deputy Director once. He turned me down. I don't know why I told you that.",
+  "Focus on the highest priority threats first.",
+];
+const CASSONIK_SUICIDE_QUOTES=[
+  "Heroes don't love being sent out alone and hurting, Director. Keep an eye on morale.",
+  "Sending someone out like that, alone and low on health? They notice, Director.",
+];
+// {text} = the 100-character line the Director typed. {name} = Director's name.
+const AUGUSTA_LOSS_TEMPLATES=[
+  (text,name)=>`"${text}" — "Yeah, yeah. Keep talking." —Franco`,
+  (text,name)=>`"${text}" — Why this director understands marketing after a loss.`,
+  (text,name)=>`I'm sorry but "${text}" is not good enough.`,
+  (text,name)=>`We almost died, but that's okay because WSPA Director ${name} says "${text}"`,
+  (text,name)=>`Let's all agree this director shouldn't be allowed to say things like "${text}" after that performance.`,
+];
+const AUGUSTA_WIN_TEMPLATES=[
+  (text,name)=>`Director ${name} is right. "${text}"`,
+  (text,name)=>`Look, I get it. You're feeling it because of that win. But saying "${text}"? Really?`,
+  (text,name)=>`"${text}". Legendary words from a legendary Director of the modern age.`,
+  (text,name)=>`WSPA needs to pay this director more. Saying things like "${text}".`,
+  (text,name)=>`"${text}". I felt that. We all need to think about that.`,
+];
+const AUGUSTA_NO_COMMENT_HEADLINE="[Augusta Spin] WSPA Director decided not to comment.";
+
+const ROM_QUIPS=["Fighting beside you makes this worth it. 💕","Stay safe out there — for me.","You make the impossible feel possible. 💕","Side by side, like always.","I'd follow you anywhere. Even here."];
+const DIS_QUIPS=["Try not to get in my way.","I'm here for the mission, not for you.","Don't speak to me until this is over.","Do your job and stay out of mine.","Not. Now."];
+const READY_QUIPS=["Back at full strength! Ready to deploy.","Fully recovered. What did I miss?","Healed up and reporting for duty.","100%. Let's go.","Ready when you are, Director."];
+function getRandQuip(h,rom,dis,deployed){
+  const r=Math.random();
+  if(deployed&&r<0.25){const rk=Object.keys(rom||{}).find(k=>k.split(",").map(Number).includes(h.id));if(rk)return ROM_QUIPS[Math.floor(Math.random()*ROM_QUIPS.length)];}
+  if(deployed&&r<0.45){if(dis&&dis[h.id]?.length>0)return DIS_QUIPS[Math.floor(Math.random()*DIS_QUIPS.length)];}
+  const hq=CP[h.title];if(hq)return hq[Math.floor(Math.random()*hq.length)];
+  return "Moving out.";
+}
+
+// ─── STATIC RELATIONSHIPS ─────────────────────────────────────────────────────
+// Linked redemption: redeeming either partner automatically redeems the other one too.
+const LINKED_REDEMPTION_PAIRS={"The Vicountess":"Dr. Stinkenstein","Dr. Stinkenstein":"The Vicountess"};
+const STATIC_REL={"The Crimson Knight|John":"dating","John|The Crimson Knight":"dating","The Sportsman|Morgana":"married","Morgana|The Sportsman":"married","IceBerg|John":"close friends","John|IceBerg":"close friends","The Dragon of the Daimyo|John":"great friends","John|The Dragon of the Daimyo":"great friends","The Flip|Adrenaline Junkie":"mentor/mentee","John|Skull Crusher":"Traning Partners","Skull Crusher|John":"Training Partners","The Gummy Bear|Big Mack":"Best Buddies","Big Mack|The Gummy Bear":"Best Buddies","The Flip|Dinosia":"research collaborators","The Vicountess|Dr. Stinkenstein":"married","Dr. Stinkenstein|The Vicountess":"married","Professor Cyanide|Greg":"married (Greg is a civilian)"};
+function getRelNotes(heroes,rom,dis){
+  const notes=[];const seen=new Set();
+  heroes.forEach(h=>{heroes.forEach(h2=>{
+    if(h.id===h2.id)return;
+    const key=`${h.title}|${h2.title}`;
+    if(STATIC_REL[key]&&!seen.has(key)){seen.add(key);seen.add(`${h2.title}|${h.title}`);notes.push(`${h.title} and ${h2.title} are ${STATIC_REL[key]}.`);}
+    const rk=[h.id,h2.id].sort().join(",");
+    if(rom[rk]&&!seen.has("r"+rk)){seen.add("r"+rk);notes.push(`${h.title} and ${h2.title} are romantically involved.`);}
+    if(dis[h.id]?.includes(h2.id)&&!seen.has("d"+h.id+h2.id)){seen.add("d"+h.id+h2.id);notes.push(`${h.title} deeply disdains ${h2.title}.`);}
+  });});return notes;
+}
+
+// ─── HERO DEFINITIONS ─────────────────────────────────────────────────────────
+const ALL_HERO_DEFS=[
+  {id:1,title:"The Crimson Knight",realName:"Mary Kantor",basePower:8.1,baseHP:86,career:"beginner",cls:"cannon",regenSec:30,functionalAt:15,romanceStatus:"Dating John",romanceLocked:true,personality:"A charming, gregarious Catholic knight. Tenacious defender of the innocent. Member of the Order of Virtue Knights Templar.",abilities:"Flight, strength, durability, Magical Sword of Virtue. 2× strength in Europe/Middle East. 10× strength in Rome.",weaknesses:"Weak against the Order of Darkness. The Mace of the Corrupted deals 10× damage.",affiliates:["Mycenzo","IceBerg","Cassonik","John","Niera","Golgotha"],specialAbility:"Unlocks John at Veteran rank.",baseAvail:true,isFemale:true,color:"#ff8844",portrait:"portraits/The_Crimson_Knight.jpg",backstory:"ANALYST LOG — Agent Adam Chris: The Crimson Knight is the hero the world needs right now. She's tough, she's kind, she's fair, and she's honest. That sword is no joke — it can sense your thoughts, and it's bound to her. She doesn't need to physically hold the sword to be imbued with its powers, and she can throw it at leisure knowing that she is an extension of the sword, and it's an extension of her. I had the chance to examine her when she was doing solo work. She stopped a villain named Troxis, but spared her life. Troxis had that very same week defeated The Anchor in a fair engagement, and she did it with style and charm that I knew would be an instant hit. She doesn't just do good, she makes being good aspirational."},
+  {id:2,title:"The Sportsman",realName:"Arthur Wick",basePower:4.1,baseHP:67,career:"intermediate",cls:"cannon",regenSec:40,functionalAt:5,romanceStatus:"Married to Morgana",romanceLocked:true,personality:"Devoted sports enthusiast who mastered every major sport into combat. Works well with others.",abilities:"Superhuman marksmanship, spear & archery, tactical acrobatics.",weaknesses:"Low durability. Extremely susceptible to magic. Deathly allergic to peanuts (Mrs. Peanut deals 5× damage).",affiliates:["Adrenaline Junkie","The Flip","Morgana"],specialAbility:"Once-in-a-Lifetime Shot: 1-in-50 chance of instant knockout against any threat.",critChance:0.02,baseAvail:true,isMale:true,bugAllergy:true,color:"#ff8844",portrait:"portraits/The_Sportsman.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: One of the few human beings we saw on TV and knew we had to recruit. He's on the roster because he's talented and tough. It's not a superpower. He's got strength, dexterity, and precision, and we knew he'd be a great addition to most teams. He ended up helping us convince The Flip to rejoin the team, and even managed to make a dent in The Flip's titanium skin. I'll be honest with you, I didn't think there were that many angles to leverage in the middle of the badlands."},
+  {id:3,title:"Morgana",realName:"Morgana",basePower:6.4,baseHP:74,career:"intermediate",cls:"support",regenSec:5,functionalAt:40,romanceStatus:"Married to The Sportsman",romanceLocked:true,personality:"By day a kind doctor, by night a powerful witch using her gifts for good.",abilities:"Expert healing, magic, telepathy.",weaknesses:"Average human durability.",affiliates:["The Sportsman"],specialAbility:"At Veteran rank: full team heal every 5 minutes.",healCooldownMax:300,healCooldown:0,baseAvail:true,isFemale:true,color:"#44ff88",portrait:"portraits/Morgana.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Morgana has been one of the best investments we've made in the past couple of years. She got into some trouble for using witchcraft in her practice after an audit was run. Why was she audited? Her success rate was too high. Her fellows believed she was lying about her successful procedures, which turned into a big controversy. I sent Nichols to meet with her, and we decided to test her skills on a hero of ours who had been critically injured, The Sportsman. Not only did she heal him back to full health, but they just celebrated their second year of marriage together a month ago."},
+  {id:4,title:"IceBerg",realName:"Borgus B. Borgus",basePower:6.7,baseHP:67,career:"veteran",cls:"cannon",regenSec:40,functionalAt:10,isMale:true,personality:"Devout Protestant. Loves church, gaming, and close friends. Known for colorful language.",abilities:"Water manipulation, ice/liquid conversion, icicle blades, drowning immunity, above-average durability.",weaknesses:"Heat. Liquid nitrogen. Altitude.",affiliates:["John","The Flip","Adrenaline Junkie"],specialAbility:"All heroes deployed alongside IceBerg gain +10 HP for the mission.",baseAvail:true,color:"#00aaff",portrait:"portraits/IceBerg.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: Those blades are sharp. When I spoke with him at his home base off the coast of Antarctica, he had the decency to heat things up for me. He's surprisingly socially oriented for a man who lives alone on a frozen tundra. He's got power, but I also think he could be delicate for a superhero. Rate 6.7."},
+  {id:5,title:"The Flip",realName:"Dr. Stee Phen",basePower:6.1,baseHP:80,career:"intermediate",cls:"tank",regenSec:30,functionalAt:20,isMale:true,personality:"Stoic anthropologist who does hero work reluctantly. Uses salary to fund archaeology expeditions.",abilities:"Short-distance teleportation, body conversion to titanium.",weaknesses:"Temperature gradients. Water.",affiliates:["Adrenaline Junkie","The Sportsman","Dinosia","Greywulf","Artemis"],specialAbility:"At Veteran rank: immediately unlocks Adrenaline Junkie.",baseAvail:true,color:"#4488ff",portrait:"portraits/The_Flip.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: Proficient. Team Player. Not very talkative, which I appreciate. Kind of hero the golden age loved, and the kind of player you can add to any roster. Rate 6.1"},
+  {id:6,title:"Cassonik",realName:"Cassandra Onik",isFemale:true,basePower:5.2,baseHP:80,career:"intermediate",cls:"support",regenSec:30,functionalAt:25,personality:"Former intelligence analyst turned precognitive strategist. Cool-headed.",abilities:"Incomplete precognition, battlefield telepathy, probability manipulation.",weaknesses:"Physical combat. Mental fatigue.",affiliates:["The Anchor","Ironside","Silphana"],specialAbility:"Oracle: reveals a threat's hidden modifier before deployment.",baseAvail:true,color:"#44ff88",portrait:"portraits/Cassonik.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: One of my best analysts decided to become one of my best heroes. I told her to stay out of it, but she wouldn't listen to me. I think it was around the time she went and recruited a hero named Bari and he ended up getting killed before we could bring him into the HQ or send him on a mission. I'm inclined to think she blames herself for it. I had told her that Bari was too green for WSPA, but she told me his electromagnetic abilities would be a real boon. Now I think she's trying to save as many lives as possible to make up for that 23 year old kid she couldn't save. She gets along well with the old guard — Ironside and The Anchor — who all seem to share that old fashioned sense of a warrior."},
+  {id:7,title:"Mycenzo",realName:"Mikel Cenzo",isMale:true,basePower:7.1,baseHP:78,career:"intermediate",cls:"tank",regenSec:35,functionalAt:20,personality:"Stoic Italian brawler. Former Vatican guard with divine stone skin. Deeply loyal.",abilities:"Stone skin immunity, earth tremor fists, near-invulnerability to physical damage.",weaknesses:"Energy attacks bypass stone skin. Extremely slow.",affiliates:["The Conductor"],specialAbility:"Immovable Object: absorbs first 20 HP of damage.",shopLocked:true,baseAvail:true,color:"#4488ff",portrait:"portraits/Mycenzo.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: For our next batch of prospects, I told you about Mycenzo. He's tough, he's deeply loyal to his causes, and he's able to pack a punch. He's slow, and that could be neutralized quickly, but proper counter play options could make him an asset. Rate 7.1. NOTE — Director Ali: Mycenzo and The Conductor appear to have developed a competitive dynamic since their first mission together. I don't know why someone as slow as him thought he could beat her in a timed race, but I honestly think it was flirting."},
+  {id:8,title:"Pyrexa",realName:"Dani Solara",isFemale:true,basePower:6.9,baseHP:72,career:"beginner",cls:"cannon",regenSec:30,functionalAt:15,personality:"Reckless pyromaniac with a heart of gold. Laughs constantly.",abilities:"Full body flame ignition, fire jets, heat immunity, aerial fire propulsion.",weaknesses:"Water. Low durability without flames.",affiliates:["Adrenaline Junkie","Morgana","Shadowmere"],specialAbility:"Combustion: 15% chance of bonus explosion on kaiju/vehicle threats.",shopLocked:true,baseAvail:true,color:"#ff8844",portrait:"portraits/Pyrexa.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: I spoke with you about this firecracker last week in Davos. She's reckless, and I don't like that. Heroes need to be precise, but she packs one hell of a fireball. Even I would think twice before lighting her off. Rate 6.9."},
+  {id:9,title:"The Conductor",realName:"Dr. Amara Nwosu",isFemale:true,basePower:5.8,baseHP:69,career:"intermediate",cls:"support",regenSec:30,functionalAt:20,personality:"Brilliant Nigerian physicist who manipulates sound waves. Calm, methodical.",abilities:"Sound wave blasts, sonic shields, echolocation, vibration disorientation.",weaknesses:"Vacuum nullifies all powers. Susceptible to magic.",affiliates:["Mycenzo"],specialAbility:"Resonance: boosts a deployed tank's HP by 15.",shopLocked:true,baseAvail:true,color:"#44ff88",portrait:"portraits/The_Conductor.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Dr. Amara was one of the heroes who we found through the academic circuit. She was developing technology, and when she demonstrated it for the first time at the Emerging Technologies Summit in Lagos, she literally blew the clothing off of Agent Chris. She did warn him, but it quite literally knocked his socks off. What was more fascinating was how she could control it. On her first mission she and Mycenzo got into a bit of a competition, and she won. I don't know why someone as slow as him thought he could beat her in a timed race, but I honestly think it was flirting."},
+  {id:10,title:"Greywulf",realName:"Harlan Cross",isMale:true,basePower:5.5,baseHP:68,career:"beginner",cls:"tank",regenSec:50,functionalAt:30,personality:"Gruff Montana ranger turned werewolf. Deeply uncomfortable with his condition.",abilities:"Werewolf form: extreme strength, speed, regeneration, heightened senses.",weaknesses:"Silver. Full moon renders uncontrollable.",affiliates:["The Flip"],specialAbility:"Pack Instinct: +0.5 power when teamed with 2+ heroes.",shopLocked:true,baseAvail:true,color:"#4488ff",portrait:"portraits/Greywulf.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: One of Cassonik's better investments that we made in a hero. I doubted her. I thought a werewolf was a bad call on a superhero team, but he's been dedicated to the mission. I remember specifically when he was facing off against a rogue coven of witches — the very scary kind — and he was a force of nature. We've been able to help him as well, locking him up in a sealed chamber every month under 5000 pounds of steel. I've seen what he can do to the steel, and he justifies every pound. He's also from near where The Flip does his digs, and the two actually knew each other before he was a werewolf."},
+  {id:11,title:"The Anchor",realName:"Solomon Vrey",isMale:true,basePower:8.1,baseHP:90,career:"veteran",cls:"tank",regenSec:50,functionalAt:40,personality:"Ancient Zulu warrior who cannot die of old age. Wise, deliberate.",abilities:"Absolute physical endurance, gravity manipulation, immovable stance.",weaknesses:"Painfully slow. Cannot fly. Weak to electricity.",affiliates:["Cassonik","Ironside"],specialAbility:"Cannot be one-shot regardless of multipliers.",baseAvail:true,color:"#4488ff",portrait:"portraits/The_Anchor.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Solomon has been alive for a very long time. He's about 166 years old, and still biologically about 35. He's one of the few people on the team who's been on as long as Seraph, and the two seem to get along well enough in that they don't talk at all. Ironside seems to take him, Cassonik, and Skull Crusher out for beers from time to time. I can say with honesty I've seen him afraid a couple of times. The first was against a now deceased supervillain named Daximous, who really got in his head. The Anchor got the better of him in the end, but only because of another hero named Wildcard who sacrificed her life for him. I think this really stuck with him, and he's become very protective over his teammates."},
+  {id:12,title:"Dr. Voidance",isMale:true,bugAllergy:true,realName:"Priya Mehta",basePower:7.0,baseHP:58,career:"intermediate",cls:"cannon",regenSec:30,functionalAt:10,personality:"Theoretical physicist split across dimensions. Frequently distracted by other realities.",abilities:"Dimensional pocket deployment, void blasts, matter phase-shifting.",weaknesses:"Very low HP. Split focus causes missed shots.",affiliates:["The Flip","Captain Shamrock"],specialAbility:"Phase Through: 20% chance of dodging all damage.",shopLocked:true,baseAvail:true,color:"#ff8844",portrait:"portraits/Dr_Voidance.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Priya is another scientist we found on the academic circuit. Her powers are a byproduct of a series of self-performed experiments and surgeries. She was attempting to recreate a portaled existence — effectively, imagine being able to travel to France in 10 steps for a bite to eat, then back home to Chicago to use your home restroom. She studied this extensively, and what she found wasn't teleportation, but instead dimensional rifts that she could open and close. If she entered one, she would still have to travel the same distance, just in a dimension that she admittedly doesn't love being in. When I had the chance to chat with her, she told me it's probably the most terrifying thing she's ever seen, and that horrors beyond human comprehension exist in different dimensions. She used to work with The Flip extensively as she tried to hone her own teleportation, but it was always a business relationship."},
+  {id:13,title:"Ironside",realName:"Marcus Thorn",isMale:true,basePower:6.5,baseHP:70,career:"veteran",cls:"tank",regenSec:40,functionalAt:35,personality:"Decorated military general with experimental nano-armor. Stern and tactical.",abilities:"Nano-armor plating, enhanced strength, EMP pulse, tactical command aura.",weaknesses:"EMP can backfire. Susceptible to heat.",affiliates:["The Anchor","Cassonik","Skull Crusher"],specialAbility:"Command Aura: +0.3 power to all deployed teammates.",baseAvail:true,color:"#4488ff",portrait:"portraits/Ironside.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Old guard kind of warrior. He was a decorated tactical mind, always fighting for the mission. He always figured himself the true leader of the team under my judgement, and he does tend to keep the peace. He doesn't seem to appreciate the lack of respect for the chain of command that many in the new guard have, and prefers working with Cassonik and The Anchor who he believes best honor the warrior tradition. These three seem to prefer working together when possible. I'm inclined to think he's vying for your job, but respectfully of course. If there's one thing he respects, it's the chain of command, but I think he's got a soft spot for people he thinks are tough like Skull Crusher."},
+  {id:14,title:"Shadowmere",realName:"Lena Voss",isFemale:true,basePower:5.3,baseHP:63,career:"beginner",cls:"cannon",regenSec:20,functionalAt:20,personality:"German assassin turned hero. Precise, private, deadly.",abilities:"Shadow manipulation, silent movement, darkness blasts, perfect marksmanship.",weaknesses:"Powerless in total light.",affiliates:["Pyrexa","Scarlett"],specialAbility:"Lone Wolf Bonus: +0.4 power when deployed solo.",shopLocked:true,baseAvail:true,color:"#ff8844",portrait:"portraits/Shadowmere.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: Shadow was one of the more controversial pickups we made recently. A former assassin has exactly the training we look for in new talent, but not the pedigree or history. She was in it for the money, but it's hard to forget what she's done. Regardless, she turned herself in, served time, and is now serving in a different way. She's been able to find some kinship with Pyrexa, but not many others on the team. I'm optimistic she'll open up more."},
+  {id:15,title:"Seraph",realName:"Unknown",basePower:8.2,baseHP:70,career:"veteran",cls:"cannon",regenSec:18,functionalAt:20,personality:"Ancient warrior who carries the Gauntlets of Light. Calm, otherworldly, occasionally cryptic, and seems to know about events between angels and demons.",abilities:"Divine energy blasts, healing light, flight, temporal slow field.",weaknesses:"Dark magic. Corruption-based attacks.",affiliates:["Eclipso","Cassonik","Blink"],specialAbility:"Celestial Aura: +5% Mission Success.",shopLocked:true,baseAvail:true,color:"#ff8844",portrait:"portraits/Seraph.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: They have been working at the WSPA since it was the WPSA, and even before that when it was the EDF. They're pretty quiet about work, but I'm reasonably certain there's a place they go under Antarctica to be alone. Seraph knew Blink's father Elegus, and when Elegus retired, Seraph appears to have taken to mentoring Blink as a favor to Elegus. As reliable as they come, I can only think of one mission they ever seemed nervous about, and it was against their former teammate Alexandria Aeros now as Silphana. She beat Seraph more than anything else I'd ever seen hit them. I knew Seraph could take a beating, but they haven't been the same since. You know what they say about betrayal — it's never done by your enemies."},
+  // UNLOCKABLE IN-GAME
+  {id:50,title:"John",realName:"John Doe",basePower:9.9,baseHP:100,career:"veteran",cls:"tank",regenSec:5,functionalAt:40,romanceStatus:"Dating The Crimson Knight",romanceLocked:true,personality:"A mystery hero of extraterrestrial origin. He appeared after The Crimson Knight vouched for him to lend a hand. Extremely gentle with villains — prefers to talk them into doing good. Enjoys discussing his homeworld, which may be destroyed, a galaxy-spanning empire, or a different dimension entirely, depending on the source.",abilities:"Super strength, super speed, flight, super durability, mirages, self-transfiguration. He even seems to have magic.",weaknesses:"Extremely powerful physical and magical blasts. Cautious nature occasionally delays action.",affiliates:["The Crimson Knight","IceBerg","The Dragon Of The Daimyo","Niera","Dinosia","Captain Shamrock","The Gummy Bear"],specialAbility:"Redemption: 20% chance per villain mission to redeem them. 20% chance to redeem BOTH on team-up missions.",isJohn:true,gameLocked:true,altPortrait:"portraits/John2.png",unlockCondition:"Unlocked when The Crimson Knight reaches Veteran rank.",redemptionCooldown:0,color:"#ffd700",portrait:"portraits/John.jpg",backstory:"ANALYST LOG — Former Director Abbas Ali: The day John arrived on Earth might have been one of the most important days for every human alive, but for John, we appear to be just another little moss ball in an infinite cosmos. He came looking to do good, but after meeting The Crimson Knight, he's really been trying to help. His first major intervention was saving Sakura's life, but since then he's probably saved everyone on the roster at least a couple of times. He never rubs it in, he doesn't gloat, and he seems endlessly fascinated with each member of the team. Whatever his species is, they love like one would not believe is possible, and it's easy to see why so many people on the team enjoy spending time with him. What's more fascinating is that every now and again an alien race will show up and thank us for letting them borrow him. Whether it's his curiosity in Earth culture or his desire to make people feel heard, he can be found anywhere from dates with The Crimson Knight in LA to guest starring on Sakura's TV show to training Skull Crusher to volunteering at food shelters with Captain Shamrock and the Gummy Bear to chilling with IceBerg in his Antarctic crevasse home base. He's allowed even our strongest members to train up by essentially being a practice dummy. It scares me that there might be more people with his abilities out in the cosmos, but I'd be lying if I didn't admit that even I feel my cold dead heart beat when I see the good he does at scales both incomprehensible and small."},
+  {id:51,title:"Adrenaline Junkie",realName:"Andrew Maxis",isMale:true,bugAllergy:true,basePower:6.4,baseHP:67,career:"beginner",cls:"support",regenSec:25,functionalAt:15,personality:"Introverted adrenaline junkie and video game developer. Lone wolf.",abilities:"Electricity control, extensive tech suits.",weaknesses:"Electrical dampeners. Large crowds.",affiliates:["The Flip"],specialAbility:"Mecha Suit: +20 HP to self. Energizes teammates.",mechaBonus:20,gameLocked:true,unlockCondition:"Unlocked when The Flip reaches Veteran rank.",color:"#44ff88",portrait:"portraits/Adrenaline_Junkie.jpg",backstory:"ANALYST LOG — Agent Neela Deepak: The Flip had told me he was fielding an eventual replacement for himself. I honestly was surprised The Flip was social enough to know people outside of his digs and his work, but he introduced me to Andrew. Andrew seems more interested in the sport, or thrill, of the hero's work. It's nice to have more internal motivation than his mentor, but it's still dangerous as a motivation all in all. Before his first mission, he had hacked into the blueprints for one or two of Ironside's older models — the ones Ironside had made when he was working in the private sector after retiring from military work. Those private servers are much easier to get access to. His hacking skills might actually be better than his hero work."},
+  {id:52,title:"Captain Shamrock",realName:"Amos Morris",basePower:5.2,baseHP:74,career:"beginner",cls:"tank",regenSec:30,functionalAt:15,personality:"Bright, enthusiastic Irish boyscout. Deeply patriotic.",abilities:"High durability and strength with the Shield of Shamrock — an immensely powerful magic shield.",weaknesses:"Normal human when separated from the shield.",affiliates:["The Flip","Dr. Voidance","John"],specialAbility:"Guardian: saves any dying hero on his mission, leaving them at 1 HP. Cannot save himself.",hotLocked:true,color:"#44bb44",portrait:"portraits/Captain_Shamrock.jpg",backstory:"ANALYST LOG — Agent Neela Deepak: This is the third Captain Shamrock in a lineage that has spanned over 80 years. Amos is nervous about taking up the mantle, and I can see why. Styles was a legend in his own right, and Hughes before him was iconic. Amos is the smallest of the three, and while he's equally patriotic, he's much more timid. Due to the nature of the shield, it wasn't possible for both Shamrocks to be active at the same time, so the transition process has been pretty difficult for Amos. Still, he's got the spirit to be great. On his first mission he was deployed alongside Dr. Voidance, and the two could not be any more different. He was desperate to please, and she was ruthlessly unapologetic. What's surprising is that this appeared to make both of them endeared to one another."},
+  {id:53,title:"Hydrothylre",realName:"Jean Pierre Shrimperson",isMale:true,basePower:3.4,baseHP:40,career:"beginner",cls:"tank",regenSec:35,functionalAt:5,personality:"Emo and depressed sentient fish-humanoid. King of the Shrimperson race.",abilities:"Oceanic mastery, summons whales and sharks. Power Level and HP double in ocean.",weaknesses:"Electricity. Low moisture. Fire. High temperatures.",affiliates:["Hydrotheppilies"],specialAbility:"Delegation: all incoming damage halved when fighting aquatic threats. Fights at 2.2× strength underwater.",gameLocked:true,unlockCondition:"Unlocked after any ocean victory.",color:"#0088cc",portrait:"portraits/Hydrothylre.jpg",backstory:"ANALYST LOG — Agent Adam Chris: Shockingly, Jean is not the first of the Shrimpersons I've met. I met his father James, but he too went by J.P. James raised his son to be king of the Shrimp people, a sentient shrimp race that lives off the coast of Morocco and Spain. I was sent to maintain relations with this group of shrimp, and while they're not much to write about on land, they're pretty impressive underwater. Jean is a little more rebellious than his father, and I think both struggle with one another. Regardless, Jean has been willing to stand up in the mantle and take his father's place as a guardian of the seas."},
+  {id:54,title:"Dinosia",realName:"Rebekka Elken",isFemale:true,basePower:6.2,baseHP:55,career:"beginner",cls:"tank",regenSec:35,functionalAt:20,personality:"Science nerd who loves dinosaurs. Lives out of a van.",abilities:"Transforms into any dinosaur for flight, strength, or speed as needed.",weaknesses:"Susceptible to magic. Weight class disadvantages.",affiliates:["The Crimson Knight","John","The Flip","Artemis"],specialAbility:"Helps The Flip with archaeology — no combat bonus, great personal joy.",gameLocked:true,unlockCondition:"Unlocked after defeating a Kaiju threat.",color:"#88cc44",portrait:"portraits/Dinosia.jpg",backstory:"ANALYST LOG — Agent George Nichols: Rebekka is one of the clearest examples of the kind of talent that you train your entire career looking for. She loves hero work, she loves helping people, and she loves telling people about science, dinosaurs, and her work. She was even quick to teach me that despite not being dinosaurs, she can turn into a pterosaur or a mosasaur. She didn't seem to mind the helicopter ride to HQ, taking the full time to teach me about something called a quetzalcoatlus and a hatzegopteryx, and what the differences are. Regardless, the combination of her abilities and her personality will be incredible, even if most people don't understand what she's saying. I think I heard word of her becoming Dr. Stee Phen's advisee for a paper she intends to write."},
+  {id:55,title:"El Infinite",realName:"Giovanni Pabloni",isMale:true,basePower:7.3,baseHP:60,career:"beginner",cls:"cannon",regenSec:40,functionalAt:3,personality:"Arrogant yet shockingly inept Masters student from California.",abilities:"Flight, super speed, extreme perception.",weaknesses:"Extremely low durability, sensory overload. No one enjoys working with him.",affiliates:[],specialAbility:"Masters Revoked: his thesis plagiarism saddens him but removes all active disdains against him.",secretTrait:"Cannot contribute to a win unless 5+ heroes are deployed on the same mission.",gameLocked:true,unlockCondition:"Unlocked after winning a battle in Rome.",color:"#ff8844",portrait:"portraits/El_Infinite.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: This guy is a prick, but he definitely has powers. I checked, and I checked again, and I checked a third time because I really was hoping it was a magic trick. He's not very durable, but the way he can move across the continent is shocking. If he had any discipline at all, he could be a generational hero. Instead he plays the part on our team despite zero confirmed tactical victories to his name. On his first mission we deployed him with Scarlett and Corvair. He reminded us he could fly, and didn't want to fly in the helicopter. He gave the helicopter a head start and then bolted toward the mission site — the sonic boom was enough to knock the helicopter out of the sky. Those two are alive because The Flip decided to ride with them. What's worse, he then got knocked out in fourteen seconds by the Supervillain Chelikere. Cass has told me to look at his potential, noting that his power level should be a 7.3 by abilities, but I argue he should be a 4.6. Hell, I think The Gummy Bear could beat him."},
+  {id:56,title:"The Gummy Bear",realName:"Josh Justice",isMale:true,basePower:4.3,baseHP:80,career:"beginner",cls:"tank",regenSec:10,functionalAt:1,personality:"Kind, warm former vet who now runs an ice cream shop. Doesn't seem interested in hurting anyone.",abilities:"Can turn body parts gelatinous, absorbing damage. Difficult to harm.",weaknesses:"Temperature variation. Water.",affiliates:["The Flip","Adrenaline Junkie","John"],specialAbility:"Cushion: halves all damage received by other heroes on his missions.",gameLocked:true,unlockCondition:"Unlocked after any victory in North America.",color:"#ffcc44",portrait:"portraits/The_Gummy_Bear.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Josh was one of those people that we thought might be a good culture fit. He's not interested in hurting anyone, even threats intent on hurting him. After recruiting him, he and I fought scorpions the size of buildings in Panama, and he did his best to neutralize the stingers. He had no interest in hurting the creatures, and I can honestly say it touched my heart. His scorpions are alive today, relocated to an offsite WSPA location where we can research why they got so big. My scorpions weren't so lucky."},
+  // ── NEW SHOP HEROES ──
+  {id:57,title:"Big Mack",realName:"Mack",isMale:true,basePower:5.1,baseHP:50,career:"beginner",cls:"cannon",regenSec:39,functionalAt:25,personality:"A dependable, classic bruiser. Make no mistake about it, he's very smart, he's just confident enough in himself to admit that he enjoys the simpler aspects of life. He enjoys Clubbing, partying, and the finer points of being a famous superhero, but he is also extremely supportive of his family and friends.",abilities:"Able to fire himself in short, powerful bursts at his foes. His high durability makes him an effective wrecking ball, but durability is charged in his blasts.",weaknesses:"After a blast, his durability and strength are reduced, and he can get nauseous.",affiliates:["The Gummy Bear","Scarlett"],specialAbility:"Charged Blasts: his blasts now do extra damage ×1.1.",shopLocked:true,baseAvail:true,color:"#ff8844",portrait:"portraits/Big_Mack.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Mack wears green because his buddy The Gummy Bear does, and the two have been friends for some time. When Mack was younger, he would train with The Gummy Bear. Mack seems to have a fascination with the finer points in life, and we recruited him out of his day job working as a bartender at a high-end club. Since then, he's been enjoying the high life of being a WSPA hero and celebrity. He had a big win against a Supervillain named Alocton, whom he incapacitated on the field of a major football game for an audience of millions. Before that hit he was Mack, but after it he was Big Mack."},
+  {id:58,title:"Scarlett",realName:"Alexandria Rose",isFemale:true,basePower:2.6,baseHP:53,career:"beginner",cls:"support",regenSec:15,functionalAt:15,personality:"A smaller, less durable hero who plays as an excellent team player. She knows what she is, doesn't complain, and fights harder than most.",abilities:"Able to shapeshift into any other person she's seen before.",weaknesses:"Human durability. Can only hold a shape for an hour or so.",affiliates:["Adrenaline Junkie","Shadowmere","Big Mack"],specialAbility:"Intel: All missions she goes on have a 10% higher success rate.",shopLocked:true,baseAvail:true,color:"#44ff88",portrait:"portraits/Scarlett.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: A shapeshifter is an excellent asset to have at any point in time, and Alexandria is no exception. While I cannot rate her higher than a 2.6 on abilities alone, her capabilities can be immensely useful. What I especially appreciate is she's excellent on teams or alone, and she's exceedingly tough for a low durability operator."},
+  {id:59,title:"Corvair",realName:"Dakota Jasup",isFemale:true,basePower:1.1,baseHP:45,career:"beginner",cls:"support",regenSec:10,functionalAt:25,personality:"A bubbly and kind hero who really shouldn't be on our roster. She has mild powers of friendship, and we can't actually tell if it's a superpower or if she's just really positive and friendly. Regardless, we feel like we can't cut her now...",abilities:"Has the ability to make anyone happier.",weaknesses:"Extremely susceptible to all forms of damage.",affiliates:["The Dragon of the Daimyo"],specialAbility:"Somewhere I Belong: upon reaching veteran, all heroes gain a boost of +0.5 to their power level.",shopLocked:true,baseAvail:true,color:"#44ff88",portrait:"portraits/Corvair.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: I know the running joke around the other agents is that I'm losing my mind, but Dakota has a chance to be valuable around here. I can't tell how, I'm not even certain she has powers, but she came to us, and I got a vision of something. It doesn't hurt that she's as sweet as can be, and I think in some small way, this is exactly what she's supposed to be doing. More than anything, it's really put a rift between myself and Alexandria, who feels like we're just letting in anyone."},
+  {id:60,title:"The Dragon of the Daimyo",realName:"Sakura Kitsune",basePower:7.3,baseHP:66,career:"beginner",cls:"tank",regenSec:30,functionalAt:40,personality:"Loves anime, westerns, dancing, Kpop, Kdrama, and gaming. Is the direct descendant of an emperor, though her magic comes from her mother's line. Extremely bubbly and warm. Enjoys emoting after winning and loves being a media darling. Has an upcoming show about her called My Life As a Dragon Warrior Princess uWu. She seems to be great friends with The Crimson Knight and John, often offering them anime recommendations, screentime, and music playlists.",abilities:"Capable of transforming into a powerful dragon. Water breath.",weaknesses:"Entirely mortal in her human form.",affiliates:["John","The Crimson Knight","Corvair"],specialAbility:"Anime Transformation: her transformation now includes thick plated dragon plate armor. +10 HP to herself and all positive affiliates / romance partners on the same mission. −10 HP to any hero who disdains her or whom she disdains.",hotLocked:true,baseAvail:true,color:"#4488ff",isFemale:true,dragonDaimyoEffect:true,portrait:"portraits/The_Dragon_Of_The_Daimyo.png",backstory:"ANALYST LOG — Former Director Abbas Ali: She was eager to do good, but the fear of failure was equally as high. Her first mission went pretty poorly as far as first missions go, and she nearly died on her own livestream. She was saved by John, who had only recently arrived on Earth for the first time. John was not sent on the mission — he didn't know we had dispatched anyone to stop what was a swarm of Nilocythian dragons. Sakura had assured us she could handle the fight by herself, and she did get in a couple of hits before she started losing. That was the first time I saw the mask come off for this very talented young woman. Mask isn't the right word — she genuinely enjoys being who she is, but she clearly has a tenderness and deep loyalty that most don't get to see. She was trying to impress me, her parents, the world even, but with a select few people I think she feels more comfortable letting her guard down. Instead of Sakura the influencer, Sakura the celebrity, or Sakura the superhero, she's got a few people where she gets to be Sakura the vulnerable. Sakura introduced John to The Crimson Knight. I'm inclined to think she looks up to them, and perhaps this only child has found some siblings."},
+  // ── NEW GAME-UNLOCK HEROES ──
+  {id:61,title:"Blink",realName:"Alex Mikonos",basePower:4.1,baseHP:46,career:"beginner",cls:"cannon",regenSec:50,functionalAt:20,personality:"A talented Greek artist who seems to be saving the world out of obligation to a former hero parent. Warm with very few people, but fiercely loyal once she opens up.",abilities:"Light manipulation and energy bursts. Slightly above human durability.",weaknesses:"Darkness. Rubber. Paint.",affiliates:["Corvair","The Gummy Bear","Seraph"],specialAbility:"Flashing Lights: ⅕ chance of halving damage to all other teammates on any mission she's on (does not protect herself).",gameLocked:true,unlockCondition:"Unlocked after defeating the Cult of Fashion.",color:"#ffe066",isFemale:true,blinkEffect:true,portrait:"portraits/Blink.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: We recruited Blink at Seraph's request. She didn't seem terribly interested, but has warmed up to the idea over time. She seems to be the only person who can get Seraph to open up about his old hero days, and much of what we know of Seraph comes from her. Blink is interesting in her own right — the daughter of Elegus is a pedigree many aspiring heroes would die for. Elegus didn't push her into hero work until her powers became undeniable, but Alex preferred sculpting and other artistry. When I spoke with her, I assured her that WSPA actually has among the best humanities access in the world, and that we could provide her with resources spanning from salary, housing, food, training, and vacation to the very best in the world art and science training materials. I think this was pretty important in her decision making, but I also think her first save played a big part as well when she saved who else but her own father after a heart attack."},
+  {id:62,title:"Skull Crusher",realName:"Hai Son",basePower:6.9,baseHP:90,career:"beginner",cls:"tank",regenSec:45,functionalAt:25,personality:"Often agitated, his powers appear to be outside of his control. He struggles not to destroy everything he touches. Working alongside him tends to get other heroes hurt. He has enjoyed training with John and Ironside.",abilities:"High strength, high durability.",weaknesses:"Magic, temperature, and calories. Deals 5 additional damage to one random teammate per mission until special is unlocked.",affiliates:["John","Ironside"],specialAbility:"Finally Mastered Being Gentle: no longer does friendly fire damage to teammates.",hotLocked:true,color:"#4488ff",isMale:true,skullCrusherFriendlyFire:true,portrait:"portraits/Skull_Crusher.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Hai is without a doubt one of the best investments we can make in our future. His strength and durability are absolutely fantastic — his only issue is his lack of ability to control it. He hates when he accidentally hurts others, and oftentimes prefers to work alone to avoid it, which is not a good thing. He enjoys training with John and Ironside, and I think he's winning everybody over one heart at a time. On his first mission, the plane carrying him went down because he was so nervous he started shaking his legs. We've had to take special precautions to ensure things like this don't happen again."},
+  {id:63,title:"Eclipso",realName:"Simone Brown",basePower:6.3,baseHP:56,career:"beginner",cls:"cannon",regenSec:40,functionalAt:9,personality:"A sharp and friendly woman who appears more interested in running her bed and breakfast and small farm than saving the world. Very quiet. Tends to show up when her friends ask.",abilities:"Telekinesis, flight, and small-scale atomic control.",weaknesses:"Gets bored often, low pain tolerance. −30% power if no positive affiliates are on the same mission.",affiliates:["Scarlett","Dinosia","Corvair","Shadowmere","Seraph"],specialAbility:"Sees the Value of the Team: removes the −30% power reduction when she reaches Veteran.",gameLocked:true,unlockCondition:"Unlocked after defeating Blight.",color:"#cc88ff",isFemale:true,eclipsoLonelyPenalty:true,portrait:"portraits/Eclipso.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: A tough nut to crack. She seems to be pretty bored by hero work, but enjoys the creativity of it. She prefers gardening, online messaging boards where she can get creative ideas for new projects, and running her bed and breakfast. On her first mission she actually walked off before we caught the bad guy because she forgot to water her plants and it was hot out."},
+// ── V7.5 NEW HERO ──
+  {id:64,title:"Tremor",realName:"Aleksei Kutnetsov",isMale:true,basePower:4.8,baseHP:75,career:"beginner",cls:"tank",regenSec:45,functionalAt:20,personality:"A very sensitive man. His abilities seem tied to his emotional state — the more confident he feels, the more powerful he becomes. Very concerned about hurting his teammates.",abilities:"His cells can become energized into magma. Immune to magma and lava, extremely fire resistant. Throws magma.",weaknesses:"Needs over 8,000 calories a day on days he uses his powers. Weak to water and wind. Powers controlled by emotional state — calmer means better control. Decently slow.",affiliates:["Pyrexa"],specialAbility:"Full Confidence: receives an additional ×1.03 increase to his power level.",critChance:0.03,gameLocked:true,unlockCondition:"Unlocked after defeating Baba Yaga.",shopLocked:false,color:"#ff8844",backstory:"ANALYST LOG — Agent George Nichols: Newer talent, he\'s very sensitive. I\'ll be the first to say I was inclined to think all Russians were very tough, very rough, very... well... Russian. Aleksei is not like that. He enjoys poetry and writing songs. He enjoys painting, and even on his first mission I caught him listening to one of Sakura\'s publicly available kpop playlists. I\'m inclined to think he\'s just really shy toward women, and I think he may have crushes on a couple of the other heroes.",portrait:"portraits/Tremor.jpg"},
+// ── V8.0 NEW SHOP HEROES ──
+  {id:65,title:"Special Operations Strike Team G",realName:"Deputy Director George Nichols",isMale:true,basePower:5,baseHP:50,career:"beginner",cls:"support",regenSec:30,functionalAt:30,personality:"An elite strike team of the world's finest, captained by Deputy Director Nichols himself.",abilities:"Coordinated weapons team capable of tactical mission operations.",weaknesses:"Team entirely composed of non powered humans.",affiliates:["Cassonik","Silphana","Ironside"],specialAbility:"Overwatch: Raises deployed tank power level by .05 when deployed together.",shopLocked:true,color:"#44ff88",portrait:"portraits/George_Nichols.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Ali had made Nichols promise not to go into the field. I guess you had different plans. Strike Team G has an excellent track record, and Nichols is almost as good of a field asset as he is a deputy director."},
+  {id:66,title:"Artemis",realName:"Estella Pocket",isFemale:true,basePower:4.7,baseHP:42,career:"beginner",cls:"cannon",regenSec:50,functionalAt:5,personality:"A rather secluded and mild mannered woman. She prefers to spend her time alone reading up on the ancient books kept in the archives. Sometimes the team forgets she's on the payroll because no one will see her for weeks.",abilities:"Anyone who she touches or who touches her experiences extreme neural pain for an extended duration. She also possesses a powerful concentrated nerve blast that can paralyze from a distance.",weaknesses:"Average human durability. Her abilities extend to friends and family, though they clearly affect other super powered people less than civilians. She has accidentally hit herself with paralysis, which has led to hospitalization.",affiliates:["Dinosia","The Flip"],specialAbility:"Gloves: WSPA analysts developed a pair of gloves that let her experience physical touch again. It made her much happier.",shopLocked:true,color:"#ff8844",portrait:"portraits/Artemis.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Estella is easy to miss around HQ — and I think she prefers that. I've been on the receiving end of her nerve pinch. It was a good day, I gave her a pat on the shoulder. I was hospitalized for a day, and could not move my hand for a week. I would describe it as feeling like lava dripping onto my hand. I feel worse for her though."},
+  {id:67,title:"Aurora",realName:"Zara Sufjan",isFemale:true,basePower:4.2,baseHP:55,career:"beginner",cls:"support",regenSec:5,functionalAt:20,personality:"An extremely skittish, very sensitive hero. Everything tends to either bore or startle her.",abilities:"Experiences time significantly slower than the average person, which makes her appear to move at speedster-like speeds to everyone else.",weaknesses:"She can't turn this off. She is perpetually passing through time faster than everyone around her.",affiliates:["Corvair","Blink","Eclipso","Skull Crusher"],specialAbility:"With serious training and a lot of assistance, she learns how to alter the rate at which she passes through time at will. It makes her extremely happy.",shopLocked:true,color:"#44ff88",portrait:"portraits/Aurora.jpg",backstory:"ANALYST LOG — Agent Cassandra Onik: Zara is functionally mute and deaf. She talks too fast for us to understand, and we are too slow. I can tell it's lonely for her, so we use messaging platforms where possible. She can't run up walls or phase like a true speedster, nor is she running halfway across the continent in seconds, but she moves so fast you'd never know she wasn't the real deal."},
+];
+
+// ─── VILLAINS ─────────────────────────────────────────────────────────────────
+const VILLAIN_DEFS=[
+  {id:100,title:"Titanaboa",realName:"Dr. Janice Molle",basePower:5.4,baseHP:65,career:"beginner",cls:"tank",regenSec:25,functionalAt:30,personality:"100-foot sentient boa constrictor — once a kind researcher, now driven by predatory instinct.",abilities:"Extreme strength, durability, venomous bite, constriction.",weaknesses:"Needs calories. Reduced intelligence.",affiliates:["Ariadus"],specialAbility:"Can return to human form at will. This does nothing for her stats but makes her really happy.",redeemable:true,threatType:"kaiju",loc:"Amazon Basin",lat:-3.0,lng:-60.0,reward:35,portrait:"portraits/Titanaboa.jpg"},
+  {id:101,title:"Ariadus",realName:"Amon St. Lauraine",basePower:6.4,baseHP:67,career:"beginner",cls:"support",regenSec:20,functionalAt:15,personality:"Absorbed a spider's personality into his DNA.",abilities:"Web creation, extreme strength, dexterity, venom, wall-climbing.",weaknesses:"Vulnerable to all elements and magic.",affiliates:["Titanaboa","Swirrlous","Chupacabra"],specialAbility:"Has learned to control his instincts. This does nothing for his stats but makes him really happy.",redeemable:true,threatType:"bio",loc:"New York, USA",lat:40.7,lng:-74.0,reward:22,portrait:"portraits/Ariadus.jpg"},
+  {id:102,title:"Maniac",realName:"Unknown",basePower:8.3,baseHP:90,career:"veteran",cls:"tank",regenSec:50,functionalAt:1,personality:"Chaos entity. Seeks only destruction. Lone Wolf.",abilities:"Extreme durability/strength, fire/magma control, wind control, flight.",weaknesses:"Susceptible to magic.",specialAbility:"TRUE POWER HIDDEN: sensors under-read this threat.",hiddenPower:true,redeemable:false,threatType:"military",loc:"Los Angeles",lat:34.05,lng:-118.24,reward:60},
+  {id:103,title:"Silphana",realName:"Alexandria Aeros",basePower:8.0,baseHP:65,career:"beginner",cls:"tank",regenSec:35,functionalAt:20,personality:"Former WSPA asset who joined the Knights of Darkness.",abilities:"The Mace of the Corrupted, high durability, speed, strength, dark magic.",weaknesses:"Vulnerable to Seraph's divine light. Dark origins make her susceptible to holy attacks.",affiliates:["Cassonik"],specialAbility:"Mace of the Corrupted deals 10× damage to The Crimson Knight and 10× damage to Seraph. Once redeemed: Mace deals 10× damage against supervillains.",redeemable:true,threatType:"military",loc:"Eastern Europe",lat:50.0,lng:25.0,reward:55,portrait:"portraits/Silphana.jpg"},
+  {id:104,title:"Chupacabra",realName:"Diego Monterrey",basePower:4.2,baseHP:50,career:"beginner",cls:"tank",regenSec:45,functionalAt:20,personality:"Former vigilante consumed by bloodlust.",abilities:"15-foot chupacabra form: extreme speed, durability, strength.",weaknesses:"Limited form duration. Weak to religious imagery.",affiliates:["Ariadus"],specialAbility:"Finds Inner Peace: This does nothing for his stats but makes him really happy.",redeemable:true,threatType:"bio",loc:"Mexico City",lat:19.4,lng:-99.1,reward:20,portrait:"portraits/Chupacabra.jpg"},
+  {id:105,title:"Swirrlous",realName:"Amanda Corrous",basePower:3.2,baseHP:25,career:"beginner",cls:"cannon",regenSec:35,functionalAt:14,personality:"Eco-terrorist leader. Avoids killing. Highly emotionally reactive.",abilities:"Large illusions, small precision explosions.",weaknesses:"Extremely low durability.",affiliates:["Ariadus","The Flip"],specialAbility:"Advisor: offers tactical deployment advice instead of fighting.",redeemable:true,threatType:"military",loc:"Pacific Northwest",lat:47.5,lng:-122.3,reward:12,portrait:"portraits/Swirrlous.jpg"},
+  {id:106,title:"Niera",realName:"Allison Basque",basePower:7.9,baseHP:80,career:"beginner",cls:"tank",regenSec:34,functionalAt:5,personality:"Ruthless combat extremist. Loyal to those who earn her respect. She seems most impressed by the indomitable will of The Crimson Knight and the overhwhelming restraint of John, preferring to primarily associate with them.",abilities:"Extreme durability, extreme physical prowess, possible magic.",weaknesses:"Susceptible to persuasion. Vulnerable to illusions.",affiliates:["The Crimson Knight","John"],specialAbility:"Dedication: all heroes alongside her gain +20 HP.",redeemable:true,threatType:"military",loc:"Brussels",lat:50.8,lng:4.4,reward:40,portrait:"portraits/Niera.jpg",backstory:"ANALYST LOG — Agent Alexandria Aeros: This is exactly what we are looking for on our team. Someone who is not afraid to make tough decisions. She is dedicated to her vision, and she is willing to take down just about anyone who gets in her way. She wants many good things; justice, prosperity, order, she is just quick to intervene. I was most impressed with her when she killed a supervillain named Igil who was threatening to destroy the world. She is no fool, she does not want power over a dead planet, and what she did to both Igil and his men was enough to make even me impressed. Rate 7.9, we need to try and recruit."},
+  {id:107,title:"Argos",realName:"Anton Vosser",basePower:6.3,baseHP:87,career:"beginner",cls:"cannon",regenSec:45,functionalAt:20,personality:"Wealthy crime lord with purchased powers. Arrogant and sophisticated.",abilities:"Powerful mech suit, naturally high durability and strength.",weaknesses:"Ego, vanity, overreliance on wealth.",affiliates:[],specialAbility:"Money Talks: at Veteran rank, fully recovers HP every 3 minutes.",redeemable:true,threatType:"military",loc:"Monaco",lat:43.7,lng:7.4,reward:50,portrait:"portraits/Argos.jpg"},
+  {id:108,title:"Scylla",realName:"Hadria Andressa",basePower:5.2,baseHP:48,career:"beginner",cls:"cannon",regenSec:45,functionalAt:25,personality:"Ancient warrior queen betrayed centuries ago, seeking revenge against humanity.",abilities:"High strength, telekinesis, Hammer of the Sun.",weaknesses:"Weak to water and cold.",affiliates:["Golgotha"],specialAbility:"Orbital Strike: usable only against other supervillains.",redeemable:true,threatType:"mystic",loc:"Mediterranean",lat:36.0,lng:14.0,reward:38,portrait:"portraits/Scylla.jpg"},
+  {id:109,title:"Golgotha",realName:"Elizia Walter",basePower:4.4,baseHP:58,career:"beginner",cls:"support",regenSec:35,functionalAt:30,personality:"Gothic vampire empress from the middle ages. Refined, elegant, champions art.",abilities:"Flight, bat transformation, mild hypnosis over underlings, mild durability.",weaknesses:"High temperatures. Fire. Sunlight. Weaker during daytime.",affiliates:["Dinosia","Scylla","The Crimson Knight"],specialAbility:"Birthright: fights at 2× strength on the European continent.",redeemable:true,threatType:"mystic",loc:"Transylvania",lat:46.0,lng:25.0,reward:30,portrait:"portraits/Golgotha.jpg"},
+  {id:110,title:"Mrs. Peanut",realName:"N/A",basePower:1.3,baseHP:55,career:"beginner",cls:"support",regenSec:1,functionalAt:1,personality:"A sentient human-sized peanut horrified by the mass slaughter of her kin.",abilities:"Shoots peanuts from fingers, spreads peanut dust. All damage ×100 against peanut allergy heroes. ×5 damage to The Sportsman.",weaknesses:"Anything.",affiliates:[],specialAbility:"Inner Peace: retires to raise a family upon redemption. Permanently removed from villain pool.",isPeanut:true,redeemable:true,threatType:"bio",loc:"Peanut Fields, Georgia",lat:32.5,lng:-83.5,reward:8,portrait:"portraits/Mrs._Peanut.jpg"},
+  // ── SHOP VILLAINS ──
+  {id:111,title:"The Vicountess",realName:"Lyn Calia",basePower:4.9,baseHP:50,career:"beginner",cls:"cannon",regenSec:25,functionalAt:25,personality:"An engineer dedicated to her own personal wealth of knowledge. Blends engineering and blood magic with ruthless curiosity, caring primarily for her family. Married to Dr. Stinkenstein.",abilities:"Blood alchemy, magic, engineering.",weaknesses:"Low durability.",affiliates:["Dr. Stinkenstein"],specialAbility:"More Sustainable Source: able to use cow's blood. This does nothing for her overall abilities, but makes her happier.",shopVillain:true,redeemable:true,threatType:"military",loc:"New York",lat:40.71,lng:-74.0,reward:30,portrait:"portraits/The_Vicountess.jpg"},
+  {id:112,title:"Dr. Stinkenstein",realName:"Coop Calia",basePower:5.1,baseHP:49,career:"beginner",cls:"cannon",regenSec:25,functionalAt:25,personality:"A prominent engineer focused on creating Weapons of Mass Disgusting. Loves his wife The Vicountess. Seems to enjoy his supervillain work for the break it provides from his day job.",abilities:"Creates devices that are extremely stinky.",weaknesses:"Normal human durability.",affiliates:["The Vicountess"],specialAbility:"Uh Oh Stinky: Can neutralize an entire field with his stink tools, increasing his attack by ×1.25 but increasing odds of heroes disdaining him by ×1.1.",shopVillain:true,redeemable:true,threatType:"military",loc:"Washington DC",lat:38.9,lng:-77.03,reward:30,portrait:"portraits/Dr._Stinkenstein.jpg"},
+  {id:113,title:"Hydrotheppilies",realName:"K.B. Shrimperson",basePower:3.3,baseHP:49,career:"beginner",cls:"tank",regenSec:40,functionalAt:25,personality:"A gothic shrimperson. Long lost cousin of Jean Pierre Shrimperson, bearing witness to historical depictions of ocean-based heroes as jokes and wanting to correct this image.",abilities:"Aquatic powers.",weaknesses:"Weak to fire, high temperatures, electricity.",affiliates:["Hydrothylre"],specialAbility:"Welcome to the Aquatic Jungle: fights at 2.2× strength underwater.",shopVillain:true,redeemable:true,threatType:"bio",loc:"Ocean",lat:0.0,lng:-30.0,reward:32,portrait:"portraits/Hydrotheppilies.jpg"},
+  // ── ALWAYS-AVAILABLE NAMED VILLAINS ──
+  {id:114,title:"Dr. Destruction",realName:"Elias D Hodge",basePower:2.1,baseHP:45,career:"veteran",cls:"cannon",regenSec:70,functionalAt:30,personality:"An aging supervillain and leader of EVOL (Evil Villains OF Lairs). Never really a massive threat — he mostly enjoyed being a supervillain and being in the news. More often than not he stops himself if he thinks no one else is going to in time. More than anything, he just seems to enjoy the community.",abilities:"Capable of causing earthquakes.",weaknesses:"Lonely. Human-level durability.",affiliates:["Professor Cyanide"],specialAbility:"New Friends: Finding community has brought youth to this old man's heart. Power level doubles; regen time cuts in half.",redeemable:true,threatType:"military",loc:"London",lat:51.5,lng:-0.12,reward:15,isMale:true,portrait:"portraits/Dr._Destruction.jpg"},
+  {id:115,title:"Smokescreen",realName:"Jessica Jacks",basePower:3.2,baseHP:40,career:"beginner",cls:"support",regenSec:55,functionalAt:30,personality:"A flirtatious and dangerous supervillain who tends to be able to manipulate people into doing what she wants.",abilities:"Immune to fire. Uses thick smoke. Can control lava if already present.",weaknesses:"Water. Ice. Wind.",affiliates:[],specialAbility:"Charisma: Can convince any other hero not in a relationship to absorb up to 5 points of damage intended for her per mission.",redeemable:true,threatType:"military",loc:"Paris",lat:48.85,lng:2.35,reward:18,isFemale:true,portrait:"portraits/Smokescreen.jpg"},
+  // ── SHOP VILLAINS ──
+  {id:116,title:"Professor Cyanide",realName:'Professor Hua "Janet" Jing',basePower:3.9,baseHP:50,career:"beginner",cls:"cannon",regenSec:40,functionalAt:24,personality:"A ruthless and cunning science professor. She has a severe soft spot for her husband Greg, who has absolutely no idea she is a villain. She funds his homeless shelter through shell corporations — he is unaware she donates around 96% of his funding.",abilities:"Toxic fumes.",weaknesses:"Human durability.",affiliates:["Dr. Destruction"],specialAbility:"Shows her husband her past and current status as a hero. He accepts her, and the two agree to have no more secrets. Does nothing for her stats but makes her happy.",shopVillain:true,redeemable:true,threatType:"bio",loc:"Los Angeles",lat:34.05,lng:-118.24,reward:22,isFemale:true,portrait:"portraits/Professor_Cyanide.jpg"},
+  {id:117,title:"Chelikere",realName:"Andy Coniek",isMale:true,basePower:4.3,baseHP:52,career:"beginner",cls:"tank",regenSec:45,functionalAt:20,personality:"A brash and egotistical supervillain who continuously tries to assert himself by beating heroes in a 1v1. Lone wolf.",abilities:"Skin is a coarse dense material — stronger than normal human skin. Durable with impressive speed for his density.",weaknesses:"Ego. Magic. Energy. Weather.",affiliates:["Kinetica"],specialAbility:"Lone Wolf Strength: fights at ×1.05 power when fighting alone.",redeemable:true,threatType:"military",loc:"New York",lat:40.71,lng:-74.0,reward:20,shopVillain:true,portrait:"portraits/Chelikere.jpg"},
+  {id:118,title:"Kinetica",realName:'Beatrice "Sammy" English',isFemale:true,basePower:5.0,baseHP:60,career:"beginner",cls:"tank",regenSec:50,functionalAt:20,personality:"Fairly charming for a supervillain, but it\'s hard to escape the feeling that she really doesn\'t care about anyone else. Hedonistic — nothing seems to matter except how things impact her.",abilities:"Every ounce of damage she receives could in theory be stored and punched back at her opponent. Any hero a point or more above her won\'t face much issue knocking her out and wiping the charged energy.",weaknesses:"Durability is nowhere near enough to fully utilize her ability to its potential.",affiliates:["Chelikere"],specialAbility:"The Meaning of Life: upon redemption, Kinetica embraces doing good in atonement. Receives a ×1.03 power level increase.",redeemable:true,threatType:"military",loc:"Washington DC",lat:38.9,lng:-77.03,reward:22,shopVillain:true,portrait:"portraits/Kinetica.jpg"},
+  {id:119,title:"Quaker",realName:"Kelly Jordan",isFemale:true,basePower:5.5,baseHP:60,career:"beginner",cls:"cannon",regenSec:55,functionalAt:15,personality:"Confident and normal until she received her powers from nuclear debris. Now terrified of hurting others. Not a supervillain by intent — she\'s actually a religious Quaker — but an immense uncontrolled threat.",abilities:"Generates large earthquakes. Cannot control it well. Frequently hurts teammates.",weaknesses:"Cannot control her powers. She doesn\'t want to hurt anyone.",affiliates:[],specialAbility:"Mastered Control: upon reaching Veteran or redemption, no longer does 5 random damage to teammates on deployment.",redeemable:true,threatType:"military",loc:"London",lat:51.5,lng:-0.12,reward:25,shopVillain:true,quakerFriendlyFire:true,portrait:"portraits/Quaker.jpg"},
+  // ── V8.0 NEW SHOP VILLAINS ──
+  {id:120,title:"Bathsheba",realName:"Carrie Parker",isFemale:true,basePower:6.0,baseHP:45,career:"beginner",cls:"support",regenSec:15,functionalAt:35,personality:"Shockingly sweet to a select few, shockingly vile to everyone else.",abilities:"Powerful magical abilities.",weaknesses:"Human durability. Powers aligned with the season and the moon.",affiliates:["Morgana","Asmodeus","Cassonik","The Crimson Knight"],specialAbility:"New Beginnings: Renounces her magic and the evils of its source, turning to proprietary WSPA technology to continue to assist. This also allows her to open up to her colleagues.",shopVillain:true,redeemable:true,threatType:"mystic",loc:"Salem, Massachusetts",lat:42.52,lng:-70.9,reward:28,portrait:"portraits/Bathsheba.jpg"},
+  {id:121,title:"Asmodeus",realName:"Archer Stone",isMale:true,basePower:7.2,baseHP:65,career:"beginner",cls:"cannon",regenSec:25,functionalAt:20,personality:"Sleek, cunning, and mysterious.",abilities:"Extremely powerful dark magic sourced from an unbelievably powerful mystic amulet called the Amulet of Anreth.",weaknesses:"Human without the amulet, but he's always wearing it.",affiliates:["Bathsheba"],specialAbility:"High Damage Lifestyle: All Cannons sent on a mission with him receive +.02 power level for that mission.",shopVillain:true,redeemable:true,threatType:"mystic",loc:"Prague, Czech Republic",lat:50.08,lng:14.43,reward:45,portrait:"portraits/Asmodeus.jpg"},
+  {id:122,title:"Tōyu",realName:"Junko Katsuhiko",isMale:true,basePower:6.4,baseHP:60,career:"beginner",cls:"cannon",regenSec:40,functionalAt:20,personality:"Extremely serious. Permanently stoic, and dedicated to his particular mission. Practices what WSPA has come to identify as Gong Tau. Harbors a serious hatred of modernity — including, by extension, heroes descended from the very lineages he once respected.",abilities:"Has both an immunity to and the ability to control a strange substance unlike anything WSPA has previously encountered. It is extremely corrosive, and can do serious damage even to WSPA's toughest heroes.",weaknesses:"Elemental attacks.",affiliates:["Golgotha","Scylla"],specialAbility:"Inner Peace: Processes some things he's been keeping to himself. Becomes significantly more team oriented and kind.",shopVillain:true,redeemable:true,threatType:"mystic",loc:"Kyoto, Japan",lat:35.0,lng:135.77,reward:38,portrait:"portraits/Toyu.jpg"},
+];
+
+// ─── LEGENDS ARCHIVE — retired heroes by the age they fought in ───────────────
+// Full stat blocks are retained here (not just display fields) for a future
+// Golden/Silver Age Director DLC. The CONFIDENTIAL "LEGENDS" screen currently
+// only surfaces status / title / real name / power level / abilities.
+const MODERN_AGE_LEGENDS=[
+  {title:"Spectrus",status:"Killed by Omniviporix"},
+  {title:"Trong",status:"Killed by Omniviporix"},
+  {title:"Bari",status:"Killed by Troxis"},
+  {title:"Magentus",status:"Killed by Omniviporix"},
+  {title:"Krava",status:"Retired after paralysis from Chelikere"},
+  {title:"Torvex",status:"Retired after being defeated by Silphana"},
+  {title:"Cask",status:"Retired after being defeated by Silphana"},
+  {title:"Lithia",status:"Killed by Omniviporix"},
+  {title:"Essencia",status:"Killed by Omniviporix"},
+  {title:"Radica",status:"Killed by Omniviporix"},
+  {title:"Taro",status:"MIA (Suspected Maniac)"},
+  {title:"Rain",status:"MIA (Suspected Maniac)"},
+  {title:"Bolt",status:"MIA (Suspected Maniac)"},
+  {title:"Vessel",status:"MIA (Suspected Maniac, claimed by Chelikere)"},
+  {title:"Greyhound",status:"MIA (Suspected Maniac)"},
+];
+
+// All Silver Age heroes are alive/retired unless individually noted otherwise.
+const SILVER_AGE_DEFS=[
+  {id:601,title:"Elegus",status:"Retired",realName:"Hector Mikonos",basePower:8.4,baseHP:85,career:"veteran",cls:"cannon",regenSec:20,functionalAt:25,personality:"Charming, talented, and elegant.",abilities:"Extremely powerful light manipulation and energy pulses. Capable of manipulating them to fly.",weaknesses:"Rubber, mud.",affiliates:["Burst","Captain Shamrock (Styles)","The Anchor","Seraph","Captain Shamrock (Hughes)","The Dragon of the Daimyo (Kimiko)","Luminia"],specialAbility:"Capable of blinding opponents with concentrated blasts of light.",portrait:"portraits/Elegus.jpg"},
+  {id:602,title:"Captain Shamrock (Styles)",status:"Retired",realName:"Lawson Styles",basePower:8.2,baseHP:90,career:"veteran",cls:"tank",regenSec:35,functionalAt:5,personality:"Solid, dependable, tends to take the damage intended for others.",abilities:"The Shield of Shamrock grants high durability, strength, and some magic aligned with the courage and honor of the bearer.",weaknesses:"Removed from the shield, ordinary human durability.",affiliates:["Elegus","The Flip","Seraph","The Dragon of the Daimyo (Kimiko)","Corouson","Plexi","Captain Shamrock (Hughes)"],specialAbility:"Capable of saving any hero, leaving them at 5 hp. Cannot save himself.",portrait:"portraits/Styles.jpg"},
+  {id:603,title:"Cinderman",status:"Retired",realName:"Blaze Berger",basePower:6.3,baseHP:50,career:"veteran",cls:"cannon",regenSec:45,functionalAt:30,personality:"A fiery hothead who tends to get into more trouble with his mouth than WSPA could procure for him on missions. Disdains Captain Shamrock (Styles).",abilities:"Powerful fire and plasma bursts.",weaknesses:"Not entirely vulnerable to his own attacks, just resistant.",affiliates:["The Anchor"],specialAbility:"Fiery speech: His taunts tend to get into his opponents' heads. +5% mission success when deployed.",portrait:"portraits/Cinderman.jpg"},
+  {id:604,title:"Luminia",status:"Retired",realName:"Adelaide Robinson",basePower:6.0,baseHP:85,career:"veteran",cls:"tank",regenSec:40,functionalAt:20,personality:"A sharp tongued firecracker who only seems to enjoy her job when it involves putting a villain in a coma.",abilities:"Born with a hyper density, making her weigh approximately 4 tons of a biological material WSPA has been studying.",weaknesses:"Water. Drowning. Heat. Electricity.",affiliates:["Elegus","Corouson"],specialAbility:"On the Chin: Luminia learns how to tank even more damage. +5 HP.",portrait:"portraits/Luminia.jpg"},
+  {id:605,title:"Corouson",status:"Retired",realName:"Amelia Arrow",basePower:6.1,baseHP:40,career:"beginner",cls:"support",regenSec:40,functionalAt:25,personality:"Charming, but oftentimes thoughtless. Tends to not look where she's going, or rather, flying.",abilities:"Fast flight. Strength.",weaknesses:"Does not possess the durability to fly recklessly or high.",affiliates:["Luminia","Captain Shamrock (Styles)"],specialAbility:"Recovery: Able to save one hero per mission if any hero is about to die. Prioritizes heroes with affiliation.",portrait:"portraits/Corouson.jpg"},
+  {id:606,title:"The Dragon of the Daimyo (Kimiko)",status:"Retired",realName:"Kimiko Kobayashi",basePower:7.4,baseHP:80,career:"intermediate",cls:"cannon",regenSec:25,functionalAt:30,personality:"A quiet, earnest woman trying to impress her mother, Suke, who was also a Dragon of the Daimyo.",abilities:"Can transform into a very powerful dragon with electrical powers.",weaknesses:"Transformation requires concentration.",affiliates:["Captain Shamrock (Styles)","Elegus","Saila"],specialAbility:"Kimiko's kind nature makes her an excellent teammate. +5hp to all teammates deployed alongside her.",portrait:"portraits/Kimiko.jpg"},
+  {id:607,title:"Hydroceps",status:"Retired",realName:"James P Shrimperson",basePower:5.4,baseHP:60,career:"intermediate",cls:"support",regenSec:30,functionalAt:20,personality:"A noble, but quiet monarch of the seas. Extremely dedicated to legacy, and avoids fights where possible.",abilities:"High powered aquatic abilities.",weaknesses:"Rather weak on land, or around a barbeque…",affiliates:[],specialAbility:"Fights at +2 combat power for underwater missions.",portrait:"portraits/Hydroceps.jpg"},
+  {id:608,title:"Saila",status:"Retired",realName:"Marisol Vanee",basePower:5.2,baseHP:45,career:"beginner",cls:"support",regenSec:20,functionalAt:20,personality:"A sweet, gentle woman despite how she often looks. Prefers the saving part of the job over the fighting.",abilities:"Phasing capabilities.",weaknesses:"Extreme cold reduces her ability to phase.",affiliates:["Corouson"],specialAbility:"Saving is the mission: Saila nullifies up to 15 damage due for her per mission.",portrait:"portraits/Saila.jpg"},
+  {id:609,title:"Plexi",status:"Retired",realName:"Carter Cast",basePower:6.0,baseHP:55,career:"beginner",cls:"support",regenSec:20,functionalAt:10,personality:"A rather rogue and rebellious hero who prefers to do what she wants, not typically what the mission calls for.",abilities:"Her entire body is elastic down to her organs and bones.",weaknesses:"She oftentimes struggles to arrange her organs into the correct position, as she still needs oxygen to reach her body parts.",affiliates:["Captain Shamrock (Styles)"],specialAbility:"Takes on a role training new heroes over doing saves herself. +.05 power level to all rostered heroes.",portrait:"portraits/Plexi.jpg"},
+  {id:610,title:"Argon",status:"Retired",realName:"Arnold Keyes",basePower:5.3,baseHP:55,career:"beginner",cls:"tank",regenSec:35,functionalAt:15,personality:"A cocky multimillionaire who figured he could make a name for himself as a powerhouse.",abilities:"Highly advanced technological mech suit.",weaknesses:"Entirely human inside the suit.",affiliates:[],specialAbility:"Secondary suit: Full heal for himself every 5 minutes.",portrait:"portraits/Argon.jpg"},
+];
+const JOHN_NEW_LOOK_QUOTE="New look, what do you think?";
+const JOHN_CLASSIC_LOOK_QUOTE="I decided to go back to the classic look.";
+const SILVER_AGE_CROSSOVER=["Seraph","The Anchor","The Flip"]; // still-active heroes who also served in the Silver Age
+const SILVER_AGE_LOST_RECORDS=["Strontium","Nitrous","Cactusman","Sloth"]; // Silver Age deceased, few records survive
+
+// ─── AGE-EXCLUSIVE SUPERVILLAINS (Golden/Silver Age Director mode) ───────────
+// Reused across both eras — already defined in VILLAIN_DEFS above, referenced here by title.
+const SHARED_AGE_VILLAINS=["Maniac","Dr. Destruction","Scylla","Golgotha"];
+const SILVER_AGE_VILLAIN_DEFS=[
+  {id:130,title:"Carrigan",realName:"Charles Wood",basePower:8.5,baseHP:90,career:"intermediate",cls:"tank",regenSec:40,functionalAt:20,isMale:true,personality:"A refined, powerful hero with a flair for sinister presentation.",abilities:"Extreme durability, strength, flight, and speed to rival a speedster.",weaknesses:"High powered focused blasts.",affiliates:[],specialAbility:"Flair: adds 3 random affiliates.",redeemable:true,loc:"London, England",lat:51.5,lng:-0.12,reward:55,threatType:"military",ageVillain:"silver",portrait:"portraits/Carrigan.jpg"},
+  {id:131,title:"Rouge",realName:"Red Rivers",basePower:6.7,baseHP:56,career:"beginner",cls:"support",regenSec:5,functionalAt:30,isFemale:true,personality:"A suave, calculating woman with a penchant for thievery. She uses her phasing as a means of thievery.",abilities:"Extreme speed. Particularly excels at the phasing element.",weaknesses:"Needs high caloric intake. Cannot phase in extreme elements. Burns through calories quickly in a fight.",affiliates:[],specialAbility:"Now you don't: 15% chance of taking no damage on a mission.",redeemable:true,loc:"Monaco",lat:43.7,lng:7.4,reward:35,threatType:"military",ageVillain:"silver",portrait:"portraits/Rouge.jpg"},
+  {id:132,title:"Dan Jones",realName:"Dan Jones",basePower:7.0,baseHP:70,career:"beginner",cls:"cannon",regenSec:45,functionalAt:40,isMale:true,personality:"A former senior analyst who leaked the names and information of our heroes when he intentionally knocked out our servers.",abilities:"Powerful electrical capabilities that he did not disclose.",weaknesses:"Mud. Rubber.",affiliates:["Razorhead","Handlebar"],specialAbility:"Dan accepts a plea deal in exchange for protection for his wife, who starts a company. (If Dan is redeemed, Razorhead joins him and vice versa.)",linkedRedemption:"Razorhead",redeemable:true,loc:"Washington D.C., USA",lat:38.9,lng:-77.03,reward:40,threatType:"tech",ageVillain:"silver",portrait:"portraits/Jones.jpg"},
+  {id:133,title:"Razorhead",realName:"Rosa Jones",basePower:5.6,baseHP:60,career:"beginner",cls:"cannon",regenSec:40,functionalAt:30,isFemale:true,personality:"A reckless and adrenaline hunting woman.",abilities:"Razor blades for teeth and nails, and a skin durable enough to never have to worry about it. She can, apparently, flex it at will.",weaknesses:"Water.",affiliates:["Dan Jones","Handlebar"],specialAbility:"She starts a razor company, giving up her current career to pursue an honest living with her husband.",linkedRedemption:"Dan Jones",redeemable:true,loc:"New Jersey, USA",lat:40.0,lng:-74.5,reward:30,threatType:"bio",ageVillain:"silver",portrait:"portraits/Razorhead.jpg"},
+  {id:134,title:"Handlebar",realName:"Chuck",basePower:6.0,baseHP:60,career:"beginner",cls:"cannon",regenSec:20,functionalAt:10,isMale:true,personality:"A motorcycle rider with a bad attitude.",abilities:"Fire generation. Immune to fire.",weaknesses:"Water.",affiliates:["Dan Jones","Razorhead"],specialAbility:"He starts a motorcycle shop, which makes him very happy. He exits the villain pool while making time for his friends.",redeemable:true,loc:"Route 66, USA",lat:35.0,lng:-101.0,reward:32,threatType:"military",ageVillain:"silver",portrait:"portraits/Handlebar.jpg"},
+  {id:135,title:"Solarbeam",realName:"Ollie Eckhart",basePower:5.2,baseHP:25,career:"beginner",cls:"cannon",regenSec:20,functionalAt:10,isMale:true,personality:"A very bold, flashy hothead who's shockingly weak for what he can produce. Plays in a band.",abilities:"Extremely powerful plasma blasts.",weaknesses:"Extremely weak frame. Can't take much damage at all. Less than the average human.",affiliates:[],specialAbility:"Realizes that he's not built for this lifestyle, and retires. No longer active.",redeemable:true,loc:"Los Angeles, USA",lat:34.05,lng:-118.24,reward:28,threatType:"military",ageVillain:"silver",portrait:"portraits/Solarbeam.jpg"},
+];
+const GOLDEN_AGE_VILLAIN_DEFS=[
+  {id:140,title:"Snorky",realName:"Albert Pachone",basePower:5.4,baseHP:55,career:"beginner",cls:"tank",regenSec:23,functionalAt:20,isMale:true,personality:"A charismatic, charming, but ruthlessly violent mob boss.",abilities:"Heightened strength and durability.",weaknesses:"Arrogance.",affiliates:[],specialAbility:"Free trade: missions he's deployed on receive 5% more in points.",redeemable:true,loc:"Chicago, USA",lat:41.88,lng:-87.63,reward:30,threatType:"military",ageVillain:"golden",portrait:"portraits/Snorky.jpg"},
+  {id:141,title:"The Black Knight",realName:"John Rickles",basePower:6.2,baseHP:55,career:"beginner",cls:"tank",regenSec:23,functionalAt:25,isMale:true,personality:"A petty thief who has real prowess with his kit.",abilities:"Heightened strength and durability.",weaknesses:"Arrogance.",affiliates:[],specialAbility:"Teamplayer: counts as both a Tank and Support main.",redeemable:true,loc:"New York, USA",lat:40.71,lng:-74.0,reward:34,threatType:"military",ageVillain:"golden",portrait:"portraits/Blackknight.jpg"},
+  {id:142,title:"Bombard",realName:"Fred Richtofen",basePower:7.3,baseHP:80,career:"beginner",cls:"cannon",regenSec:30,functionalAt:25,isMale:true,personality:"An extremely talented pilot hitting strategic WSPA sites.",abilities:"Excellent piloting prowess. Bombing.",weaknesses:"Normal human durability.",affiliates:[],specialAbility:"Teamplayer: counts as both a Tank and Support main.",redeemable:true,loc:"Washington D.C., USA",lat:38.9,lng:-77.03,reward:45,threatType:"military",ageVillain:"golden",portrait:"portraits/Bombard.jpg"},
+  {id:143,title:"The Witch of Oak Cove",realName:"Bob (Pops) Oak",basePower:4.3,baseHP:35,career:"beginner",cls:"support",regenSec:43,functionalAt:25,isMale:true,personality:"A petty thief who uses pyrotechnics to engage in theft.",abilities:"Ingenious pyrotechnics usage.",weaknesses:"Arrogance.",affiliates:[],specialAbility:"Teamplayer: counts as both a Tank and Support main.",redeemable:true,loc:"Oak Cove, Maine, USA",lat:44.0,lng:-69.0,reward:22,threatType:"mystic",ageVillain:"golden",portrait:"portraits/Oak.jpg"},
+  {id:144,title:"The Vampire of Middlesex County",realName:"Abigail Bishop",basePower:3.5,baseHP:45,career:"beginner",cls:"support",regenSec:25,functionalAt:15,isFemale:true,personality:"A dangerous vampire who torments anyone she can.",abilities:"Hypnosis.",weaknesses:"Cannot fly, no transfiguration. Relies on hypnosis.",affiliates:[],specialAbility:"Convincing: 25% chance of redeeming a supervillain.",redeemable:true,loc:"Middlesex County, New Jersey, USA",lat:40.5,lng:-74.4,reward:18,threatType:"mystic",ageVillain:"golden",portrait:"portraits/Bishop.jpg"},
+];
+// Full villain roster (by title) available to each era's Director mode.
+const SILVER_AGE_VILLAIN_ROSTER=[...SHARED_AGE_VILLAINS,...SILVER_AGE_VILLAIN_DEFS.map(v=>v.title)];
+const GOLDEN_AGE_VILLAIN_ROSTER=[...SHARED_AGE_VILLAINS,...GOLDEN_AGE_VILLAIN_DEFS.map(v=>v.title)];
+
+// All Golden Age heroes are deceased unless individually noted otherwise (e.g. Seraph, The Anchor below).
+const GOLDEN_AGE_DEFS=[
+  {id:620,title:"Captain Shamrock (Hughes)",status:"Deceased",realName:"Liam Hughes",basePower:8.5,baseHP:90,career:"intermediate",cls:"tank",regenSec:15,functionalAt:10,personality:"A rock. An absolute foundation of strength, sturdiness, and patience. He trained Styles and Elegus into some of the greatest to ever do it. Both have called him the GOAT of their heart.",abilities:"Extreme proficiency with the Shield of Shamrock.",weaknesses:"Human without the shield.",affiliates:["Trekken","Wildcard","Magnetrix","Lamentia","Hydromous","Fats","The Anchor","Seraph","Elegus","Captain Shamrock (Styles)"],specialAbility:"Can save any hero from death except for himself, leaving them at 1 hp.",portrait:"portraits/Hughes.jpg"},
+  {id:621,title:"Trekken",status:"Deceased",realName:"Janice Ormund",basePower:5.0,baseHP:40,career:"beginner",cls:"support",regenSec:3,functionalAt:5,personality:"A fast talking, slick, and speedy personality.",abilities:"A true speedster, capable of moving at incredible speeds — faster than most bullets.",weaknesses:"Low durability. Sonic booms can hurt her ears.",affiliates:["Captain Shamrock (Hughes)","Wildcard","Magnetrix","Lamentia","Hydromous","Fats","The Anchor","Seraph"],specialAbility:"Now you see me? 15% chance of taking no damage on a mission.",portrait:"portraits/Trekken.jpg"},
+  {id:622,title:"Wildcard",status:"Killed in action — sacrificed herself to save The Anchor",realName:"Vanessa Stock",basePower:5.3,baseHP:45,career:"beginner",cls:"support",regenSec:15,functionalAt:20,personality:"A wily and reckless trickster with a heart of gold. Rather flirtatious with her teammates.",abilities:"Capable of drawing from a power list that includes heightened speed, strength, and durability, but only one at a time.",weaknesses:"She can only use one ability at a time.",affiliates:["Captain Shamrock (Hughes)","Trekken","Magnetrix","Lamentia","Hydromous","Fats","The Anchor","Seraph"],specialAbility:"Able to save any affiliate from dying, leaving them at 1hp. Cannot save herself.",portrait:"portraits/Wildcard.jpg"},
+  {id:623,title:"Magnetrix",status:"Deceased",realName:"Elizabeth Audi",basePower:3.9,baseHP:45,career:"beginner",cls:"support",regenSec:7,functionalAt:20,personality:"A sweet, caring woman with exceptional medicinal skills.",abilities:"Medicinal powers capable of keeping heroes in the fight.",weaknesses:"Ordinary human durability.",affiliates:["Captain Shamrock (Hughes)","Trekken","Wildcard","Lamentia","Hydromous","Fats","The Anchor","Seraph"],specialAbility:"Pulse: full health restore of all heroes every 5 minutes.",portrait:"portraits/Magnetrix.jpg"},
+  {id:624,title:"Lamentia",status:"Deceased",realName:"Raven Sett",basePower:7.8,baseHP:78,career:"beginner",cls:"cannon",regenSec:35,functionalAt:14,personality:"A brilliant, cunning woman with a real enjoyment for the game.",abilities:"Extremely powerful void magic. Capable of opening rifts to other dimensions and discharging a dark energy blast.",weaknesses:"Arrogance.",affiliates:["Captain Shamrock (Hughes)","Trekken","Wildcard","Magnetrix","Hydromous","Fats","The Anchor","Seraph"],specialAbility:"Used to the darkness: If Lamentia is about to die, 50/50 chance she evades with 15hp remaining.",portrait:"portraits/Lamentia.jpg"},
+  {id:625,title:"Hydromous",status:"Deceased",realName:"Jordan P. Shrimperson",basePower:7.5,baseHP:75,career:"beginner",cls:"tank",regenSec:25,functionalAt:30,personality:"A warrior in a shrimp's body. A king of the sea unafraid of anyone or anything.",abilities:"Extreme water proficiency.",weaknesses:"Weak near heat or on land.",affiliates:["Captain Shamrock (Hughes)","Trekken","Wildcard","Magnetrix","Lamentia","Fats","The Anchor","Seraph"],specialAbility:"+1 combat power on underwater missions.",portrait:"portraits/Hydromous.jpg"},
+  {id:626,title:"Fats",status:"Deceased",realName:"Michael Desco",basePower:5.5,baseHP:65,career:"beginner",cls:"tank",regenSec:25,functionalAt:5,personality:"A blunt and cunning wiseguy.",abilities:"His bones are as durable as brass.",weaknesses:"Very heavy. Water.",affiliates:["Captain Shamrock (Hughes)","Trekken","Wildcard","Magnetrix","Lamentia","Hydromous","The Anchor","Seraph"],specialAbility:"Wise guy: +.05 combat power to all heroes deployed on the same mission.",portrait:"portraits/Fats.jpg"},
+];
+const GOLDEN_AGE_CROSSOVER=["Seraph","The Anchor"]; // still-active heroes who also served in the Golden Age
+const GOLDEN_AGE_LOST_RECORDS=["Jaxx","Echo","Solace","Burst","Bullet","Archie","Slugger","Ironjaw","Helmethead"]; // Golden Age deceased, few records survive
+
+// Shared across BOTH Golden and Silver Age Director mode.
+const IRON_LEGEND_DEF={id:630,title:"The Iron Legend",status:"Deceased",realName:"Raymond Mason",basePower:4.5,baseHP:50,career:"beginner",cls:"support",regenSec:25,functionalAt:15,isMale:true,personality:"By day, the best defense lawyer to ever practice. By night, a superhero with a brilliant mind. He kept Luminia out of prison after a little mishap in LA. He was commissioned as WSPA's legal counsel.",abilities:"Extremely intelligent. Slightly above average strength. Solves most fights with the combined might of logic and a quick shot.",weaknesses:"Unsure if he actually has powers.",affiliates:["Elegus","Captain Shamrock (Styles)","Luminia","The Dragon of the Daimyo (Kimiko)","Captain Shamrock (Hughes)","Trekken","Wildcard","Magnetrix","Lamentia","Hydromous","Fats"],specialAbility:"The Best Defense: 50% chance of redeeming a supervillain.",portrait:"portraits/Mason.jpg",
+  backstory:"\"Few heroes were as powerful as the man who somehow got us through the litigation of the golden and silver ages. Every insurance claim, every accident, every slip up. He was the man. The average civilian will remember Hughes, Elegus, or Styles. But I'll never forget The Iron Legend. He passed away only recently. I know the golden age was from the 40's to the 80's, the silver from the 80's to the 2020's, but I felt like he would be there forever. Most of the silver age squad never got the chance to meet him, he'd long since pivoted to full time legal work. It's where he could do the most good. He redeemed a lot of supervillains. The last time I talked to him was a month after he retired. He was in his 90's. The last of the Golden age heroes. He'd painted two portraits of him with the rest of the golden age heroes. I was hoping he'd give one to WSPA, but he, in all his wisdom, gave them to Seraph and The Anchor. It was the happiest I'd seen Solomon in my life. Seraph as well. Enough to make a grown man cry.\" - Director Abbas Ali"};
+
+// Full hero roster (by title) available to each era's Director mode.
+const SILVER_AGE_ROSTER=[...SILVER_AGE_DEFS.map(h=>h.title),IRON_LEGEND_DEF.title,...SILVER_AGE_CROSSOVER];
+const GOLDEN_AGE_ROSTER=[...GOLDEN_AGE_DEFS.map(h=>h.title),IRON_LEGEND_DEF.title];
+
+// ─── THREAT POOL ─────────────────────────────────────────────────────────────
+const ALL_THREATS=[
+  {id:201,name:"KAIJU: GORGOZAR",loc:"Tokyo, Japan",lat:35.7,lng:139.7,priority:"red",type:"kaiju",desc:"Massive amphibious kaiju emerging from Tokyo Bay. OMEGA priority.",maxTimer:180,reward:50,isKaiju:true},
+  {id:202,name:"Rogue AI Overthrow",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"orange",type:"tech",desc:"Autonomous AI seizing defense infrastructure.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:203,name:"Demonic Outbreak",loc:"Rome, Italy",lat:41.9,lng:12.5,priority:"orange",type:"mystic",desc:"Demonic entities breaching near the Vatican. Deals +10 damage per hero deployed beyond the first 4.",maxTimer:300,reward:35,isRome:true,demonicEffect:true},
+  {id:204,name:"Plague Outbreak",loc:"Central Africa",lat:-2.0,lng:22.0,priority:"orange",type:"bio",desc:"Engineered pathogen spreading through civilian populations.",maxTimer:320,reward:28},
+  {id:205,name:"KAIJU: LOBSTROCITY",loc:"Pacific Ocean",lat:10.0,lng:-150.0,priority:"orange",type:"kaiju",desc:"Enormous crustacean kaiju rampaging through shipping lanes.",maxTimer:240,reward:40,isOcean:true,isKaiju:true},
+  {id:206,name:"Seven-Headed Dragon",loc:"Transylvania, Romania",lat:46.0,lng:25.0,priority:"red",type:"mystic",desc:"Ancient seven-headed dragon awakened from slumber. Deals ×1.05 damage to cannon-class heroes.",maxTimer:200,reward:55,sevenDragonEffect:true},
+  {id:207,name:"Order of Darkness",loc:"Jerusalem, Israel",lat:31.8,lng:35.2,priority:"red",type:"mystic",desc:"The corrupted Knights Templar mobilising for a major assault.",maxTimer:250,reward:50,recurring:true},
+  {id:208,name:"Seven Deadly Sins Cult",loc:"Paris, France",lat:48.9,lng:2.3,priority:"orange",type:"military",desc:"A cult performing dangerous rituals across the city.",maxTimer:340,reward:30},
+  {id:209,name:"Arcanoxum Mega Bear",loc:"Antarctica",lat:-75.0,lng:0.0,priority:"red",type:"kaiju",desc:"A prehistoric mega-predator awakened beneath the ice.",maxTimer:220,reward:52,isKaiju:true},
+  {id:210,name:"Radioactive Chimpanzees",loc:"Congo, Africa",lat:-1.0,lng:24.0,priority:"yellow",type:"bio",desc:"Infected radioactive super-chimpanzees rampaging.",maxTimer:360,reward:22},
+  {id:211,name:"Division 7 Strike",loc:"WSPA HQ",lat:38.9,lng:-77.0,priority:"red",type:"military",desc:"A former WSPA splinter group attempting to destroy our operations.",maxTimer:200,reward:48,recurring:true},
+  {id:212,name:"FELIOS: Monster of the Deep",loc:"North Atlantic",lat:45.0,lng:-40.0,priority:"orange",type:"kaiju",desc:"Ancient deep-sea entity ascending toward coastal cities.",maxTimer:260,reward:42,isOcean:true,isKaiju:true},
+  {id:213,name:"Cult of the Bleeding Lance",loc:"Istanbul, Turkey",lat:41.0,lng:29.0,priority:"yellow",type:"mystic",desc:"Extremist religious cult performing mass rituals.",maxTimer:380,reward:25},
+  {id:214,name:"Rogue Billionaire",loc:"Dubai, UAE",lat:25.2,lng:55.3,priority:"yellow",type:"military",desc:"A billionaire deploying private armies at random.",maxTimer:400,reward:20},
+  {id:215,name:"Hurricane Category 6",loc:"Gulf of Mexico",lat:24.0,lng:-90.0,priority:"orange",type:"disaster",desc:"Superpowered hurricane threatening coastal populations.",maxTimer:180,reward:25,isOcean:true,isNorthAmerica:true},
+  {id:216,name:"KAIJU: WOLFGAR",loc:"Siberia, Russia",lat:60.0,lng:100.0,priority:"orange",type:"kaiju",desc:"Colossal wolf-creature carving a path toward Moscow.",maxTimer:230,reward:38,isKaiju:true},
+  {id:217,name:"Chaos Guild vs Order of Chaos",loc:"Eastern Europe",lat:50.0,lng:25.0,priority:"yellow",type:"military",desc:"Two warring factions tearing apart infrastructure — both hate us.",maxTimer:350,reward:24},
+  {id:218,name:"Reality-Warping Board Game",loc:"Tokyo, Japan",lat:35.7,lng:139.7,priority:"red",type:"mystic",desc:"A sentient board game trapping civilians in alternate realities.",maxTimer:210,reward:50},
+  {id:219,name:"Sentient Video Game Villain",loc:"Seoul, Korea",lat:37.6,lng:127.0,priority:"orange",type:"tech",desc:"An AI character has built itself a physical body. Deals ×2 damage to all female heroes.",maxTimer:270,reward:34,videoGameEffect:true},
+  {id:220,name:"KAIJU: MOLGRATH",loc:"Tokyo, Japan",lat:35.7,lng:139.7,priority:"red",type:"kaiju",desc:"Magma-armored titan emerging from Mt. Fuji.",maxTimer:160,reward:58,isKaiju:true},
+  {id:221,name:"KAIJU: KONGOLOX",loc:"Mumbai, India",lat:19.1,lng:72.9,priority:"orange",type:"kaiju",desc:"Colossal gorilla kaiju tearing through the coastline.",maxTimer:200,reward:45,isKaiju:true},
+  {id:222,name:"THE LOCH NESS MONSTER",loc:"Loch Ness, Scotland",lat:57.3,lng:-4.4,priority:"orange",type:"kaiju",desc:"The legendary leviathan has finally surfaced.",maxTimer:250,reward:40,isOcean:true,isKaiju:true},
+  {id:223,name:"BARGHUUUL THE DESTROYER",loc:"Sahara Desert",lat:23.0,lng:12.0,priority:"red",type:"mystic",desc:"Ancient cosmic destroyer. Reality warps in its presence.",maxTimer:180,reward:65},
+  {id:224,name:"THE GREAT WORM",loc:"Australian Outback",lat:-25.0,lng:135.0,priority:"orange",type:"kaiju",desc:"A really, really, really big worm. Structures collapsing continent-wide.",maxTimer:240,reward:42,isKaiju:true},
+  {id:225,name:"Human-Sized Ant Swarm",loc:"Brazil",lat:-10.0,lng:-51.0,priority:"yellow",type:"bio",desc:"Thousands of human-sized ants swarming settlements.",maxTimer:360,reward:22},
+  {id:226,name:"Undead Mummy of Karseth",loc:"Cairo, Egypt",lat:30.1,lng:31.2,priority:"orange",type:"mystic",desc:"An undead mummy wielding ancient magic has risen. Deals ×2 damage to male heroes.",maxTimer:280,reward:35,mummyEffect:true},
+  {id:227,name:"ALIEN INVASION",loc:"Multiple Cities",lat:39.0,lng:-98.0,priority:"red",type:"military",desc:"Extraterrestrial forces attacking New York, London, Tokyo, and Sydney simultaneously.",maxTimer:160,reward:70},
+  {id:228,name:"Cult of Fashion",loc:"Milan, Italy",lat:45.5,lng:9.2,priority:"yellow",type:"military",desc:"A bizarre fashion cult brainwashing civilians with designer gear.",maxTimer:400,reward:15},
+  {id:229,name:"Fire Worshippers",loc:"Iceland",lat:65.0,lng:-18.5,priority:"yellow",type:"mystic",desc:"A fire-worshipping sect has summoned a genuine flame entity.",maxTimer:380,reward:20},
+  {id:230,name:"KAIJU: NESSIE'S COUSIN",loc:"Pacific Ocean",lat:10.0,lng:-150.0,priority:"orange",type:"kaiju",desc:"A distant relative of the Loch Ness Monster. Less shy.",maxTimer:240,reward:38,isOcean:true,isKaiju:true},
+  {id:231,name:"North American Blackout",loc:"New York, USA",lat:40.7,lng:-74.0,priority:"orange",type:"tech",desc:"Coordinated cyberattack plunging the eastern seaboard into darkness.",maxTimer:260,reward:28,isNorthAmerica:true},
+  {id:232,name:"Landslide",loc:"Andean Mountains",lat:-15.0,lng:-72.0,priority:"yellow",type:"disaster",desc:"A catastrophic landslide endangering mountain communities.",maxTimer:400,reward:14},
+  {id:233,name:"Genetically Modified Super Ticks",loc:"Appalachia, USA",lat:37.5,lng:-81.5,priority:"yellow",type:"bio",desc:"An outbreak of genetically modified super ticks. Their bite causes unpredictable mutations.",maxTimer:380,reward:18,isNorthAmerica:true},
+  {id:234,name:"Super Mega Extra Evil Ebola",loc:"Central Africa",lat:-2.0,lng:22.0,priority:"red",type:"bio",desc:"A terrifyingly advanced hemorrhagic pathogen spreading at unnatural speed.",maxTimer:200,reward:55},
+  {id:235,name:"Mild Zombie Apocalypse",loc:"New Orleans, USA",lat:30.0,lng:-90.1,priority:"orange",type:"bio",desc:"A zombie outbreak — mild as far as apocalypses go, but still extremely inconvenient.",maxTimer:320,reward:30,isNorthAmerica:true},
+  {id:236,name:"Nudist Colony War",loc:"Southern France",lat:43.5,lng:3.5,priority:"yellow",type:"military",desc:"A militant nudist colony has declared war on the clothed world. The threat is more organised than expected.",maxTimer:420,reward:12},
+  {id:237,name:"Baton Rouge Restoration Cult",loc:"Baton Rouge, USA",lat:30.5,lng:-91.2,priority:"yellow",type:"military",desc:"A local cult dedicated to some incomprehensible form of civic restoration.",maxTimer:400,reward:10,isNorthAmerica:true},
+  {id:238,name:"The Order Of The Fungus",loc:"Pacific Northwest, USA",lat:47.5,lng:-122.3,priority:"orange",type:"bio",desc:"A mycological collective of humans who have willingly merged with a sentient fungal network.",maxTimer:300,reward:28,isNorthAmerica:true},
+  {id:239,name:"Rogue Violent Bigfoot Gang",loc:"Rocky Mountains, USA",lat:39.5,lng:-106.0,priority:"yellow",type:"military",desc:"A band of rogue and extremely violent Bigfoot specimens terrorizing hiking trails.",maxTimer:380,reward:15,isNorthAmerica:true},
+  {id:240,name:"The Dangerous Fae King",loc:"Ireland",lat:53.4,lng:-8.0,priority:"red",type:"mystic",desc:"An ancient and capricious Fae King has opened his court to the mortal world — with lethal consequences.",maxTimer:220,reward:52},
+  {id:241,name:"Gnome Outbreak",loc:"Bavaria, Germany",lat:48.1,lng:11.6,priority:"yellow",type:"mystic",desc:"A gnome outbreak. They're not individually dangerous but there are so many of them.",maxTimer:400,reward:10},
+  {id:242,name:"The Mogollon Monster",loc:"Arizona, USA",lat:33.5,lng:-112.1,priority:"yellow",type:"military",desc:"The legendary Mogollon Monster has emerged from the wilderness and is extremely annoyed.",maxTimer:380,reward:14,isNorthAmerica:true},
+  {id:243,name:"The Swamp Monster",loc:"Florida Everglades, USA",lat:25.5,lng:-80.8,priority:"orange",type:"bio",desc:"A primordial swamp creature of immense size and unclear motivations.",maxTimer:300,reward:24,isNorthAmerica:true},
+  {id:244,name:"The Ningen",loc:"Antarctic Ocean",lat:-65.0,lng:20.0,priority:"orange",type:"kaiju",desc:"A massive, humanoid deep-sea creature of unknown origin has been spotted near Antarctica.",maxTimer:280,reward:35,isOcean:true,isKaiju:true},
+  {id:245,name:"The OhNohMi",loc:"Himalayas",lat:28.0,lng:84.0,priority:"orange",type:"mystic",desc:"A cryptid creature from the deep Himalayan peaks has descended into populated valleys. Nobody is sure what it wants.",maxTimer:290,reward:28},
+  {id:246,name:"The Chaotic Order Of Organized Chaos",loc:"Brussels, Belgium",lat:50.8,lng:4.4,priority:"orange",type:"military",desc:"An organisation dedicated to organised chaos. They are extremely well-organised about it.",maxTimer:310,reward:26},
+  {id:247,name:"Good Guys R Us (Bioterror)",loc:"San Francisco, USA",lat:37.8,lng:-122.4,priority:"red",type:"bio",desc:"A well-meaning but extraordinarily naive activist group of college students has accidentally committed bioterrorism while trying to help.",maxTimer:200,reward:44,isNorthAmerica:true},
+  {id:248,name:"The Card King",loc:"Las Vegas, USA",lat:36.2,lng:-115.1,priority:"red",type:"mystic",desc:"A dark monster summoned by shuffling a deck of cards in a precise order. Someone in Vegas found out the hard way.",maxTimer:210,reward:48,isNorthAmerica:true},
+  {id:249,name:"Alemeus the Alien Divorcee",loc:"Washington D.C., USA",lat:38.9,lng:-77.0,priority:"yellow",type:"military",desc:"An alien committing crimes just so someone will show up and listen to him talk about his divorce and the children he lost custody of.",maxTimer:440,reward:8,isNorthAmerica:true},
+  {id:250,name:"The Order Of Greg",loc:"Ohio, USA",lat:40.4,lng:-82.9,priority:"yellow",type:"military",desc:"A death cult dedicated to bringing their beloved friend Greg back from the dead. Greg is alive. He just moved away and doesn't call as much.",maxTimer:450,reward:8,isNorthAmerica:true},
+  {id:251,name:"Undead King George III + Redcoat Legion",loc:"Boston, USA",lat:42.4,lng:-71.1,priority:"red",type:"mystic",desc:"The undead ghost of King George III and his legion of undead Redcoats are attempting to retake America.",maxTimer:200,reward:55,isNorthAmerica:true},
+  {id:252,name:"Division 8",loc:"Paris",lat:48.85,lng:2.35,priority:"red",type:"military",desc:"A splinter faction of Division 7, dedicated to destroying both the world and Division 7. Outstanding commitment.",maxTimer:190,reward:50,recurring:true},
+  {id:253,name:"The Definitely Good Guys Friendship Guild",loc:"Geneva, Switzerland",lat:46.2,lng:6.1,priority:"orange",type:"military",desc:"Definitely not good people, but they understand marketing. Sophisticated branding, villainous intent.",maxTimer:290,reward:28},
+  {id:254,name:"Frenzied Venomous Rabid Snails",loc:"French Riviera",lat:43.7,lng:7.3,priority:"yellow",type:"bio",desc:"Frenzied, venomous, rabid snails. Faster than you'd think, but not like super fast.",maxTimer:420,reward:10},
+  {id:255,name:"MEGALODON (on steroids)",loc:"Pacific Ocean",lat:10.0,lng:-150.0,priority:"red",type:"kaiju",desc:"The prehistoric apex predator, back, and on steroids. The ocean is no longer safe.",maxTimer:200,reward:55,isOcean:true,isKaiju:true},
+  {id:256,name:"Lizard People from Underground",loc:"Beneath Denver, USA",lat:39.7,lng:-104.9,priority:"orange",type:"military",desc:"An advanced subterranean lizard civilisation has emerged and is deeply unimpressed by the surface world.",maxTimer:280,reward:32,isNorthAmerica:true},
+  {id:257,name:"Feral Bug People (Deeper Underground)",loc:"Beneath Kansas, USA",lat:38.5,lng:-98.0,priority:"orange",type:"bio",desc:"Feral insectoid humanoids from even deeper underground than the lizard people. They are very upset about the lizard people.",maxTimer:270,reward:30,isNorthAmerica:true},
+  {id:258,name:"The Homunculus Liberation Front",loc:"Vienna, Austria",lat:48.2,lng:16.4,priority:"yellow",type:"military",desc:"A liberation movement for artificially-created humanoids. Their demands are surprisingly reasonable but their methods are not.",maxTimer:360,reward:18},
+  {id:259,name:"The Samsquanch",loc:"Canadian Wilderness",lat:55.0,lng:-95.0,priority:"orange",type:"military",desc:"A superpowered man who dresses as Sasquatch to incite an interspecies war between humans and cryptids.",maxTimer:300,reward:26,isNorthAmerica:true},
+  {id:260,name:"The Baddest Baddies",loc:"Monaco",lat:43.7,lng:7.4,priority:"orange",type:"military",desc:"An elite villain unit who define themselves as glamorously evil. Extraordinarily well-dressed. Very dangerous.",maxTimer:290,reward:32},
+  {id:261,name:"Silver Meadows HOA",loc:"Phoenix, Arizona, USA",lat:33.4,lng:-112.1,priority:"yellow",type:"military",desc:"An extremely vicious homeowners association. They have somehow acquired military-grade enforcement capabilities. Deals +10 damage per hero deployed beyond the first 4.",maxTimer:400,reward:10,isNorthAmerica:true,hoaEffect:true},
+  {id:262,name:"BEEHIVE THE SIZE OF RHODE ISLAND",loc:"Rhode Island, USA",lat:41.7,lng:-71.5,priority:"red",type:"bio",desc:"A beehive the size of Rhode Island has appeared overnight. The bees are not happy.",maxTimer:190,reward:52,isNorthAmerica:true,isKaiju:true},
+  {id:263,name:"THE ANCIENT GREEK TITAN OCEANUS",loc:"Atlantic Ocean",lat:30.0,lng:-40.0,priority:"red",type:"mystic",desc:"The primordial Titan Oceanus has risen from the depths of the Atlantic.",maxTimer:200,reward:60,isOcean:true},
+  {id:264,name:"REAPER: ENTITY OF DARKNESS",loc:"Los Angeles",lat:34.05,lng:-118.24,priority:"red",type:"mystic",desc:"An entity of darkness who deals 45 damage to all support heroes. Avoid deploying support classes.",maxTimer:195,reward:58,reaperEffect:true},
+  {id:265,name:"CALAXES: THE PRECAMBRIAN MONSTER",loc:"Pacific Rim",lat:35.0,lng:145.0,priority:"red",type:"kaiju",desc:"A brutally tough monster from the Precambrian era. Deals 30 damage to all tanks regardless of stats.",maxTimer:200,reward:55,calaxesEffect:true,isKaiju:true},
+  {id:266,name:"ARCHONOIS: THE MAGIC USER",loc:"Eastern Europe",lat:50.0,lng:25.0,priority:"red",type:"mystic",desc:"A magic user poised to deal 30 damage to all cannons regardless of stats.",maxTimer:200,reward:55,archonoisEffect:true},
+  {id:267,name:"TYPHON: FATHER OF MONSTERS",loc:"Mediterranean Sea",lat:36.0,lng:14.0,priority:"purple",type:"mystic",desc:"Typhon, Father of Monsters. Deals exactly 280 damage split evenly across the entire party. Any hero except John is at lethal risk. John can take no more than 50 total damage from Typhon.",maxTimer:180,reward:80,typhonEffect:true},
+  {id:268,name:"GEORGE THE GENTLE",loc:"Appalachia, USA",lat:37.5,lng:-81.5,priority:"orange",type:"bio",desc:"An arthropleura from centuries prior, covered in ancient bacteria. Friendly but extremely dangerous to be near.",maxTimer:270,reward:32,isNorthAmerica:true},
+  {id:269,name:"Body Snatching Plants",loc:"Florida, USA",lat:27.5,lng:-81.5,priority:"orange",type:"bio",desc:"Aggressive body-snatching plants have begun converting civilians across the southeast.",maxTimer:260,reward:30,isNorthAmerica:true},
+  {id:270,name:"Oversized Mobile Venus Fly Traps",loc:"Carolina Coast, USA",lat:34.0,lng:-77.9,priority:"orange",type:"bio",desc:"Oversized mobile venus fly traps have broken containment and are moving inland.",maxTimer:270,reward:28,isNorthAmerica:true},
+  {id:271,name:"A Child With Matter Manipulation",loc:"Midwest, USA",lat:41.0,lng:-89.0,priority:"red",type:"mystic",desc:"A child with matter manipulation and a temper. Do not upset them.",maxTimer:210,reward:50,isNorthAmerica:true},
+  {id:272,name:"THE GIANT SQUID",loc:"North Pacific",lat:35.0,lng:-155.0,priority:"orange",type:"kaiju",desc:"The legendary Giant Squid has surfaced and is in a terrible mood.",maxTimer:250,reward:38,isOcean:true,isKaiju:true},
+  {id:273,name:"THE COLOSSAL SQUID",loc:"Southern Ocean",lat:-60.0,lng:20.0,priority:"red",type:"kaiju",desc:"The Colossal Squid — larger, angrier, and somehow faster.",maxTimer:210,reward:55,isOcean:true,isKaiju:true},
+  {id:274,name:"THE LEVIATHAN",loc:"Deep Atlantic",lat:20.0,lng:-40.0,priority:"red",type:"mystic",desc:"The Leviathan stirs in the deep. Biblical proportions. Deals +10 damage per hero deployed beyond the first 4.",maxTimer:185,reward:65,isOcean:true,leviathanEffect:true},
+  {id:275,name:"LIVYATAN POD",loc:"South Atlantic",lat:-25.0,lng:-15.0,priority:"orange",type:"kaiju",desc:"A pod of Livyatan — ancient sperm whale predators — has awoken and is hunting.",maxTimer:240,reward:40,isOcean:true,isKaiju:true},
+  {id:276,name:"MOSASAURUS POD",loc:"Gulf of Mexico",lat:24.0,lng:-90.0,priority:"orange",type:"kaiju",desc:"A pod of Mosasaurs is rampaging through the Gulf of Mexico.",maxTimer:245,reward:40,isOcean:true,isKaiju:true,isNorthAmerica:true},
+  {id:277,name:"AN IMMORTAL SNAIL (One Guy's Problem)",loc:"New York, USA",lat:40.7,lng:-74.0,priority:"yellow",type:"mystic",desc:"An immortal snail is chasing after one guy for some reason. The guy is panicking. This is somehow a city-wide emergency.",maxTimer:420,reward:10,isNorthAmerica:true},
+  {id:278,name:"Deranged Cartoon Creatures",loc:"Los Angeles, USA",lat:34.1,lng:-118.2,priority:"orange",type:"mystic",desc:"A very strange person is manifesting semi-sentient and deranged versions of beloved cartoon creatures across Los Angeles.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:279,name:"DISEASE CONTAINMENT BREACH: All Extremities Fall Off",loc:"CDC Atlanta, USA",lat:33.8,lng:-84.4,priority:"red",type:"bio",desc:"The mosquitoes broke containment of the 'All Extremities Fall Off Disease' research facility. Yes, including that one.",maxTimer:195,reward:58,isNorthAmerica:true},
+  {id:280,name:"Bioweapon: Shareholder Value Apathy",loc:"Wall Street, New York, USA",lat:40.7,lng:-74.0,priority:"yellow",type:"bio",desc:"A bioweapon that makes people not care about maximizing shareholder value has been unleashed. Economists are inconsolable.",maxTimer:420,reward:8,isNorthAmerica:true},
+  {id:281,name:"Squirrel Pursuing an Acorn (Massive Collateral Damage)",loc:"Multiple Cities",lat:39.0,lng:-98.0,priority:"orange",type:"bio",desc:"A squirrel that keeps causing large calamities as it pursues a single acorn.",maxTimer:280,reward:24},
+  {id:282,name:"Cat Stuck in a Tree",loc:"Des Moines, Iowa, USA",lat:41.6,lng:-93.6,priority:"yellow",type:"military",desc:"A cat is stuck in a tree. The situation has somehow escalated. John takes exactly 60 damage every time he is deployed here — no more, no less.",maxTimer:500,reward:5,isNorthAmerica:true,catTreeEffect:true},
+  {id:283,name:"Robot Fraternity: College Hazing Research",loc:"Campus, USA",lat:40.0,lng:-83.0,priority:"orange",type:"tech",desc:"A fraternity of robots is attempting to understand college hazing. Their methods are destructive and deeply misguided.",maxTimer:290,reward:24,isNorthAmerica:true},
+  {id:284,name:"METEOR STRIKE",loc:"Incoming",lat:30.0,lng:0.0,priority:"red",type:"disaster",desc:"A meteor is inbound. Impact in T-minus too soon.",maxTimer:180,reward:60},
+  {id:285,name:"TSUNAMI",loc:"Pacific Coast",lat:36.0,lng:-122.0,priority:"red",type:"disaster",desc:"A category 6 tsunami is bearing down on the Pacific Coast.",maxTimer:200,reward:50,isOcean:true,isNorthAmerica:true},
+  {id:286,name:"TSUNAMI STRIKING NUCLEAR REACTOR",loc:"Pacific Coast Nuclear Facility",lat:36.0,lng:-122.5,priority:"red",type:"disaster",desc:"A tsunami is hitting a nuclear reactor. This is exactly as bad as it sounds.",maxTimer:185,reward:65,isOcean:true,isNorthAmerica:true},
+  {id:287,name:"THE TORTOISE GUILD",loc:"Galapagos Islands",lat:-0.5,lng:-90.4,priority:"yellow",type:"military",desc:"An ancient and remarkably well-organised guild of giant tortoises with unclear but deeply concerning intentions.",maxTimer:400,reward:12},
+  {id:288,name:"ARCTIC CROSSBREEDING STATION",loc:"Arctic Research Station",lat:80.0,lng:15.0,priority:"red",type:"bio",desc:"An Arctic station researching the crossbreeding of Ebola, the common cold, rabies, and measles. It's gone terribly wrong.",maxTimer:190,reward:62},
+  {id:289,name:"Evil Scientists Convention",loc:"Geneva, Switzerland",lat:46.2,lng:6.1,priority:"orange",type:"military",desc:"All of the world's evil scientists have decided to hold a convention. Attendance is surprisingly high.",maxTimer:270,reward:28},
+  {id:290,name:"EVIL HACKERS",loc:"New York",lat:40.71,lng:-74.0,priority:"orange",type:"tech",desc:"An elite network of evil hackers is systematically dismantling global infrastructure.",maxTimer:260,reward:32,recurring:true},
+  {id:291,name:"A Crop Blight",loc:"Midwest USA",lat:41.0,lng:-89.0,priority:"orange",type:"bio",desc:"A supernatural crop blight is spreading across the heartland at an alarming rate, threatening food supply chains.",maxTimer:300,reward:28,isNorthAmerica:true},
+  {id:292,name:"A Petty Criminal With Three Wishes",loc:"Las Vegas, USA",lat:36.2,lng:-115.1,priority:"orange",type:"mystic",desc:"A small-time crook has gotten hold of a genuine lamp. His wishes are petty. The consequences are not.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:293,name:"A Runaway Trolley Posing An Ethical Dilemma",loc:"Philadelphia, USA",lat:40.0,lng:-75.2,priority:"yellow",type:"military",desc:"A runaway trolley. Five people on one track. One on another. Philosophers are rioting. Someone please just stop the trolley.",maxTimer:420,reward:8,isNorthAmerica:true},
+  {id:294,name:"Professional Basketball Franchise Owners",loc:"New York, USA",lat:40.7,lng:-74.0,priority:"orange",type:"military",desc:"The professional basketball franchise owners have taken civilians hostage and are forcing them to watch their dying sport. Attendance is at an all-time low and they are desperate.",maxTimer:310,reward:26,isNorthAmerica:true},
+  {id:295,name:"The Cringe Crew",loc:"Los Angeles, USA",lat:34.1,lng:-118.2,priority:"orange",type:"military",desc:"A group of content creators committing increasingly dangerous crimes for views. Subscriber counts are through the roof. Property damage is catastrophic.",maxTimer:290,reward:24,isNorthAmerica:true},
+  {id:296,name:"Anthony the Lethal Gas Guy",loc:"Chicago, USA",lat:41.9,lng:-87.6,priority:"orange",type:"bio",desc:"Anthony is a good person. He just gets nervous and produces lethal gas when he does. He's nervous a lot. He needs help, not judgment.",maxTimer:300,reward:22,isNorthAmerica:true},
+  {id:297,name:"A Very Hungry Caterpillar",loc:"Vermont, USA",lat:44.0,lng:-72.7,priority:"yellow",type:"bio",desc:"It is very hungry. It has eaten through three counties. Local agriculture is decimated. It shows no signs of stopping.",maxTimer:380,reward:14,isNorthAmerica:true},
+  {id:298,name:"A Mechanized Kaiju From Space",loc:"Pacific Coast",lat:36.0,lng:-122.0,priority:"red",type:"kaiju",desc:"A fully mechanized kaiju of alien origin has made landfall. It is larger, faster, and angrier than any kaiju on record.",maxTimer:185,reward:65,isKaiju:true,isNorthAmerica:true},
+  {id:299,name:"An Empire of Three Alien Conquerors",loc:"Washington D.C., USA",lat:38.9,lng:-77.0,priority:"red",type:"military",desc:"An alien empire has come to conquer Earth. There are only three of them. They are, however, extremely superpowered and deeply committed to the bit.",maxTimer:200,reward:55,isNorthAmerica:true},
+  {id:300,name:"The Yeti",loc:"Himalayas",lat:28.0,lng:84.0,priority:"orange",type:"kaiju",desc:"The Yeti has been found. It is enormous. It is not pleased about being found.",maxTimer:270,reward:32,isKaiju:true},
+  {id:301,name:"The Mothman",loc:"West Virginia, USA",lat:38.5,lng:-80.5,priority:"orange",type:"mystic",desc:"The Mothman has returned to the Point Pleasant area and is causing widespread panic. Some locals appear to be worshipping it.",maxTimer:280,reward:28,isNorthAmerica:true},
+  {id:302,name:"Angry Eco-Conscious Mermaids",loc:"Atlantic Coast",lat:35.0,lng:-75.0,priority:"orange",type:"mystic",desc:"A collective of environmentally furious mermaids has declared war on coastal industrial infrastructure. Their demands are reasonable. Their methods are not.",maxTimer:290,reward:30,isOcean:true},
+  {id:303,name:"Mongolian Death Worms",loc:"Gobi Desert, Mongolia",lat:44.0,lng:107.0,priority:"orange",type:"bio",desc:"A swarm of Mongolian Death Worms has emerged from beneath the Gobi. They spit acid and conduct electricity. There are thousands of them.",maxTimer:275,reward:34},
+  {id:304,name:"The Dover Demon",loc:"Dover, Massachusetts, USA",lat:42.2,lng:-71.3,priority:"yellow",type:"mystic",desc:"The Dover Demon has reappeared. Nobody is entirely sure what it wants. It is very unsettling to look at.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:305,name:"B-List Zombie Movie Pulling Viewers In",loc:"Hollywood, USA",lat:34.1,lng:-118.3,priority:"orange",type:"mystic",desc:"A low-budget zombie film has gained sentience and is pulling civilians into its universe. The special effects are terrible. The danger is not.",maxTimer:285,reward:26,isNorthAmerica:true},
+  {id:306,name:"Zombified Asian Giant Hornets",loc:"Pacific Northwest, USA",lat:47.5,lng:-122.3,priority:"red",type:"bio",desc:"Zombified Asian Giant Hornets the size of small dogs have formed a swarm. Deals ×4 damage to heroes with bug allergies.",maxTimer:195,reward:58,isNorthAmerica:true,zombieHornetEffect:true},
+  {id:307,name:"Baba Yaga",loc:"Siberian Forest, Russia",lat:58.0,lng:82.0,priority:"red",type:"mystic",desc:"The ancient witch Baba Yaga has emerged from her walking hut in the deep Siberian forest and is not in a good mood. Defeating her unlocks Tremor.",maxTimer:200,reward:55,unlockHero:"Tremor"},
+  {id:308,name:"Omniviporix Autonomous Intelligence Killbot",loc:"Washington DC",lat:38.9,lng:-77.03,priority:"red",type:"tech",desc:"A fully autonomous killbot of unknown origin. Does exactly 90 damage to any hero sent alone. Works significantly less effectively against teams.",maxTimer:195,reward:58,omniviporixEffect:true,recurring:true},
+  {id:309,name:"Nilocythian Dragon Swarm",loc:"Pacific Rim",lat:35.0,lng:140.0,priority:"orange",type:"kaiju",desc:"A swarm of Nilocythian dragons — the same species that nearly killed The Dragon of the Daimyo on her first mission. Deals 2× damage to Dinosia, Titanaboa, Ariadus, Greywulf, or The Dragon of the Daimyo.",maxTimer:240,reward:38,nilocythianEffect:true,isKaiju:true},
+  {id:310,name:"The Rake",loc:"Pacific Northwest, USA",lat:47.5,lng:-122.0,priority:"orange",type:"mystic",desc:"A tall, emaciated creature that moves on all fours. It watches. It waits. And then it does not wait.",maxTimer:270,reward:34,isNorthAmerica:true},
+  {id:311,name:"The Witch of Bell Ridge",loc:"Appalachia, USA",lat:37.5,lng:-81.5,priority:"orange",type:"mystic",desc:"A centuries-old witch of terrifying power has been disturbed. She is not pleased about it and the surrounding counties are suffering for it.",maxTimer:260,reward:36,isNorthAmerica:true},
+  {id:312,name:"A Sentient and Very Violent Tree",loc:"Olympic National Forest, USA",lat:47.8,lng:-123.6,priority:"orange",type:"bio",desc:"A sentient tree. It is very violent. It can also walk. It has chosen to do so toward a populated area.",maxTimer:280,reward:28,isNorthAmerica:true},
+  {id:313,name:"The Pincerless Pinster",loc:"London",lat:51.5,lng:-0.12,priority:"yellow",type:"kaiju",desc:"A low-level threat on its own — but for every hero deployed beyond the first, this monster does 10% more damage. Solo deployment strongly recommended.",maxTimer:380,reward:18,pinsterEffect:true},
+  {id:314,name:"Coco",loc:"Caribbean Sea",lat:18.0,lng:-72.0,priority:"orange",type:"mystic",desc:"A spirit of immense local legend has taken physical form and is terrorizing coastal settlements. Locals are divided on whether to stop it.",maxTimer:290,reward:30,isOcean:true},
+  {id:315,name:"Jinn",loc:"Arabian Peninsula",lat:23.0,lng:45.0,priority:"red",type:"mystic",desc:"A powerful Jinn of the old world has been accidentally freed and is exacting its will upon the region without mercy.",maxTimer:205,reward:54},
+  {id:316,name:"PseudoSapiens",loc:"Multiple Cities",lat:39.0,lng:-98.0,priority:"red",type:"military",desc:"Things that look like people, walk like people, talk like people — but only do so to prey on people. Widespread infiltration detected across multiple major cities.",maxTimer:195,reward:60,recurring:true},
+  {id:317,name:"The Caresquesque",loc:"Paris, France",lat:48.9,lng:2.3,priority:"red",type:"mystic",desc:"A being that infects mirrors and pulls people into mirror dimensions to consume them. Paris is reporting mass disappearances.",maxTimer:200,reward:58},
+  {id:318,name:"Dakuwaqa",loc:"Fiji, Pacific Ocean",lat:-18.0,lng:178.0,priority:"orange",type:"mystic",desc:"The shark god of Fijian legend has awakened in the Pacific and is targeting coastal vessels and settlements.",maxTimer:265,reward:36,isOcean:true},
+  {id:319,name:"Marsupials of Unusual Size",loc:"Fire Swamp, Southern France",lat:43.5,lng:3.5,priority:"yellow",type:"bio",desc:"Enormous marsupials of unusual size have been reported in the fire swamps of southern France. They are vicious. They are fast. They are very large.",maxTimer:380,reward:14},
+  // ── V8 THREAT WAVE ──
+  {id:320,name:"A Magnetic Spiritual Vortex In Flux",loc:"Bermuda Triangle",lat:25.0,lng:-71.0,priority:"orange",type:"mystic",desc:"An unstable magnetic-spiritual vortex is warping the region. Its field disrupts heavy armor entirely — Tanks cannot contribute to mission success here.",maxTimer:300,reward:30,vortexEffect:true},
+  {id:321,name:"Moscovium Meteor",loc:"Reykjavik, Iceland",lat:64.1,lng:-21.9,priority:"orange",type:"disaster",desc:"A glowing meteor teeming with Moscovium is making people act strange. Deployed heroes with a power level under 5 are dealt 2× damage.",maxTimer:290,reward:32,moscoviumEffect:true},
+  {id:322,name:"A Meteor The Size Of Ten Thousand Refrigerators",loc:"Australian Outback",lat:-25.0,lng:135.0,priority:"red",type:"disaster",desc:"A meteor roughly the size of ten thousand refrigerators is on a collision course with a populated region.",maxTimer:200,reward:50},
+  {id:323,name:"Four-Nation Trade And Tax War",loc:"Geneva, Switzerland",lat:46.2,lng:6.1,priority:"purple",type:"military",desc:"A regional trade and tax dispute between four sovereign nations has escalated to the brink of open conflict.",maxTimer:190,reward:75},
+  {id:324,name:"Uncontained Belgian Breakout",loc:"Brussels, Belgium",lat:50.8,lng:4.4,priority:"yellow",type:"military",desc:"An uncontained group of Belgians is attempting to break out of a WSPA containment perimeter.",maxTimer:420,reward:10},
+  {id:325,name:"Undead Viking Berserkers",loc:"Reykjavik, Iceland",lat:64.1,lng:-21.9,priority:"yellow",type:"mystic",desc:"Undead Viking berserkers have risen from ancient burial mounds, intent on reclaiming Iceland.",maxTimer:400,reward:14},
+  {id:326,name:"Outraged Italian Football Riots",loc:"Rome, Italy",lat:41.9,lng:12.5,priority:"yellow",type:"military",desc:"Outraged Italians are threatening to riot after failing to qualify for the global soccer tournament for the 14th year straight.",maxTimer:420,reward:8},
+  {id:327,name:"Incompetent Battleship Captain",loc:"Great Barrier Reef, Australia",lat:-18.3,lng:147.7,priority:"yellow",type:"disaster",desc:"A very incompetent battleship captain has just crashed a nuclear battleship into a coral reef.",maxTimer:400,reward:12,isOcean:true},
+  {id:328,name:"Capsized Cruise Liner",loc:"Caribbean Sea",lat:18.0,lng:-72.0,priority:"yellow",type:"disaster",desc:"A cruise liner is floating upside down after being struck by a rogue wave.",maxTimer:400,reward:12,isOcean:true},
+  {id:329,name:"Alien Demands Planetary 1v1",loc:"Washington D.C., USA",lat:38.9,lng:-77.0,priority:"yellow",type:"military",desc:"An alien has arrived demanding a 1v1 duel for ownership of the planet. We don't think he's really all that up to the challenge.",maxTimer:440,reward:8,isNorthAmerica:true},
+  {id:330,name:"The Sheepsquatch Of Boone County",loc:"Boone County, West Virginia, USA",lat:38.0,lng:-81.4,priority:"yellow",type:"mystic",desc:"The Sheepsquatch of Boone County has been sighted again, terrorizing local livestock and hikers.",maxTimer:400,reward:10,isNorthAmerica:true},
+  {id:331,name:"The Fire Dragon Of Pocahontas County",loc:"Pocahontas County, West Virginia, USA",lat:38.3,lng:-79.9,priority:"yellow",type:"mystic",desc:"The Fire Dragon of Pocahontas County has emerged from the hills once again.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:332,name:"Dinosaur Theme Park Malfunction",loc:"Costa Rica",lat:9.7,lng:-83.5,priority:"orange",type:"bio",desc:"A dinosaur theme park that both brought back dinosaurs and lost them. Dinosia gets +30 to mission success rate on this mission.",maxTimer:290,reward:30,dinoParkEffect:true},
+  {id:333,name:"A Rakshasa",loc:"Northern India",lat:28.6,lng:77.2,priority:"yellow",type:"mystic",desc:"A Rakshasa of ancient legend has manifested and is preying on nearby villages.",maxTimer:380,reward:16},
+  {id:334,name:"The Phi Am",loc:"Hanoi, Vietnam",lat:21.0,lng:105.8,priority:"yellow",type:"mystic",desc:"The Phi Am has been sighted stalking the outskirts of the city. It deals ×1.2 damage to heroes below 50% health.",maxTimer:380,reward:16,phiAmEffect:true},
+  {id:335,name:"The Kappa",loc:"Kyoto, Japan",lat:35.0,lng:135.8,priority:"yellow",type:"mystic",desc:"The Kappa has resurfaced near the riverbanks, luring in curious civilians.",maxTimer:380,reward:14},
+  {id:336,name:"Apophis",loc:"Cairo, Egypt",lat:30.1,lng:31.2,priority:"purple",type:"mystic",desc:"Apophis has risen. Known as Falak in the Middle East and Jormungand in Norse mythology. Deals +3 damage to each hero deployed beyond the first 2.",maxTimer:190,reward:78,apophisEffect:true},
+  {id:337,name:"Humbaba",loc:"Mesopotamian Ruins, Iraq",lat:33.3,lng:44.4,priority:"orange",type:"mystic",desc:"Humbaba, guardian of the ancient forest, has awoken and is laying waste to the surrounding region.",maxTimer:300,reward:28},
+  {id:338,name:"Sirens Disrupting Global Trade",loc:"Aegean Sea",lat:38.0,lng:25.0,priority:"yellow",type:"mystic",desc:"Sirens have taken to disrupting global shipping lanes with their song.",maxTimer:400,reward:14,isOcean:true},
+  {id:339,name:"A Weeping Demon",loc:"Mexico City, Mexico",lat:19.4,lng:-99.1,priority:"yellow",type:"mystic",desc:"A weeping demon is attempting to drown children near the city's waterways.",maxTimer:380,reward:16},
+  {id:340,name:"A Vibecoding Developer",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"yellow",type:"tech",desc:"A vibecoding developer is unknowingly destroying the power grid one deployed commit at a time.",maxTimer:400,reward:10,isNorthAmerica:true},
+  {id:341,name:"Murderous Extraterrestrial Clowns",loc:"Multiple Cities",lat:39.0,lng:-98.0,priority:"orange",type:"military",desc:"Murderous extraterrestrial clowns have landed and are terrorizing multiple cities at once.",maxTimer:290,reward:28},
+  {id:342,name:"A Violent Sentient Tire",loc:"Mojave Desert, USA",lat:35.0,lng:-116.0,priority:"yellow",type:"bio",desc:"A violent, sentient tire is rolling through the desert, destroying everything in its path.",maxTimer:400,reward:10,isNorthAmerica:true},
+  {id:343,name:"Haunted Animatronic Pizza Franchise",loc:"Suburban USA",lat:39.8,lng:-89.6,priority:"yellow",type:"mystic",desc:"A children's pizza franchise with haunted animatronics has come alive after hours.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:344,name:"A Growing Blob",loc:"Rural Pennsylvania, USA",lat:40.3,lng:-76.9,priority:"orange",type:"bio",desc:"A growing blob has consumed a small town and keeps growing.",maxTimer:300,reward:28,isNorthAmerica:true},
+  {id:345,name:"Undead Slasher At Summer Camp",loc:"Adirondacks, USA",lat:43.9,lng:-74.2,priority:"yellow",type:"mystic",desc:"An undead slasher figure is stalking a summer camp in the mountains.",maxTimer:380,reward:14,isNorthAmerica:true},
+  {id:346,name:"Hunter Alien",loc:"Amazon Rainforest, Brazil",lat:-3.0,lng:-60.0,priority:"yellow",type:"military",desc:"An honor-bound but very violent alien equipped with stealth technology is hunting in the rainforest.",maxTimer:380,reward:16},
+  {id:347,name:"Supersoldier Freelance Organization",loc:"Eastern Europe",lat:50.0,lng:25.0,priority:"red",type:"military",desc:"A supersoldier freelance organization is committing crimes under a Director trying to bring his wife back from the dead.",maxTimer:210,reward:55,recurring:true},
+  {id:348,name:"A Man In A Killdozer",loc:"Rural Colorado, USA",lat:39.5,lng:-106.0,priority:"yellow",type:"military",desc:"A man in a heavily armored bulldozer is trying to make a statement about local politics.",maxTimer:420,reward:8,isNorthAmerica:true},
+  {id:349,name:"Mount Vesuvius Eruption",loc:"Naples, Italy",lat:40.8,lng:14.4,priority:"yellow",type:"disaster",desc:"Mount Vesuvius has begun to erupt once more.",maxTimer:400,reward:14},
+  {id:350,name:"Popocatepetl Eruption",loc:"Puebla, Mexico",lat:19.0,lng:-98.6,priority:"yellow",type:"disaster",desc:"Popocatepetl is erupting, threatening nearby communities.",maxTimer:400,reward:14},
+  {id:351,name:"Mount Sinabung Eruption",loc:"Sumatra, Indonesia",lat:3.2,lng:98.4,priority:"yellow",type:"disaster",desc:"Mount Sinabung has erupted, spreading ash across the region.",maxTimer:400,reward:14},
+];
+
+// Fisher-Yates shuffle
+// Golden Age Director mode threat pool
+const GOLDEN_AGE_THREATS=[
+  {id:400,name:"Corner Store Wise Guys",loc:"Brooklyn, New York, USA",lat:40.65,lng:-73.95,priority:"yellow",type:"military",desc:"A couple of wise guys are shaking down the corner store for protection money nobody asked to pay.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:401,name:"Central Avenue Turf Brawl",loc:"Newark, New Jersey, USA",lat:40.73,lng:-74.17,priority:"yellow",type:"military",desc:"A brawl between two rival neighborhood crews has spilled out across Central Avenue and isn't stopping on its own.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:402,name:"The Suspicious Hot Dog Stand",loc:"Coney Island, New York, USA",lat:40.57,lng:-73.98,priority:"yellow",type:"bio",desc:"A hot dog stand is selling something that is technically classified as food. Several customers have reported seeing colors that don't exist.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:403,name:"Crime Family Turf Dispute",loc:"Chicago, USA",lat:41.88,lng:-87.63,priority:"orange",type:"military",desc:"Two crime families are feuding over territory, and the collateral damage is starting to look like a warzone.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:404,name:"The Parachuting Bank Robber",loc:"Pacific Northwest, USA",lat:45.5,lng:-121.8,priority:"orange",type:"military",desc:"A man has stolen a fortune in cash from a moving plane and parachuted into the wilderness. Nobody has found him. Nobody has found the money.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:405,name:"The Fire Nobody Started",loc:"Chicago, USA",lat:41.85,lng:-87.65,priority:"orange",type:"disaster",desc:"A fire is spreading through the warehouse district. Every witness insists, very firmly, that they did not start it.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:406,name:"Accidental Nuclear Bomb Drop",loc:"Rural Georgia, USA",lat:32.5,lng:-83.0,priority:"purple",type:"tech",desc:"A bomber has accidentally dropped a live nuclear device over open farmland. It has not detonated. Yet.",maxTimer:190,reward:75,isNorthAmerica:true},
+  {id:407,name:"The Book That Convinces People To Kill",loc:"London, England",lat:51.5,lng:-0.12,priority:"red",type:"mystic",desc:"A strange, unassuming little book is circulating that seems to convince anyone who finishes it to commit murder.",maxTimer:200,reward:50},
+  {id:408,name:"The Motel Off The Highway",loc:"Rural Arizona, USA",lat:34.0,lng:-111.0,priority:"orange",type:"military",desc:"A motel just off the highway has a proprietor with a very hands-on approach to his guests, and an unusually low checkout rate.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:409,name:"An Art House Director's Real Suffering",loc:"Hollywood, USA",lat:34.1,lng:-118.3,priority:"orange",type:"military",desc:"A movie director has decided that his actors' suffering must be genuine to be art. WSPA disagrees, strongly.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:410,name:"Break-In At The Riverside Hotel",loc:"Washington D.C., USA",lat:38.9,lng:-77.05,priority:"orange",type:"military",desc:"A covert operation has been discovered breaking into a well-appointed hotel along the Potomac, hunting for something they shouldn't have.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:411,name:"The Unsinkable Ship, Sinking Again",loc:"North Atlantic",lat:45.0,lng:-40.0,priority:"orange",type:"disaster",desc:"Yet another ship marketed as unsinkable is, once again, sinking. Passengers are surprisingly calm about it at this point.",maxTimer:280,reward:30,isOcean:true},
+  {id:412,name:"The Hotel You Can Never Leave",loc:"California, USA",lat:39.0,lng:-121.0,priority:"orange",type:"mystic",desc:"Guests at a remote hotel have found that their reservations never seem to end, no matter how hard they try to check out.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:413,name:"The Cab-Driving Vigilante",loc:"New York, USA",lat:40.71,lng:-74.0,priority:"yellow",type:"military",desc:"A cab driver has taken the city's crime problem personally, and is now handling it himself \u2014 badly, and violently.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:414,name:"A Possession In The Capital",loc:"Washington D.C., USA",lat:38.9,lng:-77.03,priority:"red",type:"mystic",desc:"A young child in the capital has become host to something ancient and extremely displeased. The family is requesting discretion.",maxTimer:200,reward:50,isNorthAmerica:true},
+  {id:415,name:"A Great White With A Point To Prove",loc:"Cape Cod, Massachusetts, USA",lat:41.7,lng:-70.0,priority:"orange",type:"kaiju",desc:"An enormous great white shark has decided the coastline belongs to it, personally, and is enforcing that belief.",maxTimer:280,reward:30,isOcean:true,isKaiju:true},
+  {id:416,name:"Superfans Of A New Space Saga",loc:"Los Angeles, USA",lat:34.05,lng:-118.24,priority:"yellow",type:"military",desc:"A group of fans has taken their devotion to a new space adventure serial several steps past reasonable and several steps into property damage.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:417,name:"Fraternity-Wide City Damage",loc:"Ohio, USA",lat:40.0,lng:-83.0,priority:"yellow",type:"military",desc:"A college fraternity's antics have somehow escalated to the point of citywide infrastructure damage. Nobody can quite explain how.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:418,name:"A Very Rough Prom Night",loc:"Maine, USA",lat:45.0,lng:-69.0,priority:"orange",type:"mystic",desc:"A girl with real psychic powers and very little patience left had a humiliating night at prom. The gymnasium did not survive.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:419,name:"The Kids' Baseball Team Causing An International Incident",loc:"Midwest USA",lat:41.0,lng:-93.0,priority:"yellow",type:"military",desc:"A hapless kids' little league team has, somehow, triggered an international diplomatic crisis. Nobody can explain how, but here we are.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:420,name:"A Slasher With A Complicated Family",loc:"Rural Texas, USA",lat:31.0,lng:-99.0,priority:"orange",type:"military",desc:"A masked assailant with a genuinely tragic backstory is being manipulated into violence by his own family. WSPA would rather redeem than end him.",maxTimer:280,reward:30,isNorthAmerica:true,redeemableThreat:true},
+  {id:421,name:"Banjo-Playing Swamp Folk",loc:"Louisiana Bayou, USA",lat:30.0,lng:-91.0,priority:"yellow",type:"bio",desc:"A reclusive swamp community has taken up an extremely aggressive style of banjo playing that is, inexplicably, causing structural damage for miles.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:422,name:"Rabid Piranha Infestation",loc:"Amazon Basin",lat:-3.0,lng:-60.0,priority:"orange",type:"bio",desc:"A river has become infested with rabid piranhas showing wildly aggressive, coordinated pack behavior.",maxTimer:280,reward:30},
+  {id:423,name:"The Hypnotic Jewelry Shop",loc:"Fifth Avenue, New York, USA",lat:40.77,lng:-73.97,priority:"yellow",type:"mystic",desc:"A jewelry shop downtown appears to be hypnotizing every passerby into buying, and buying, and buying.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:424,name:"The Magical, Absent-Minded Nanny",loc:"London, England",lat:51.5,lng:-0.12,priority:"yellow",type:"mystic",desc:"A magical nanny with extraordinary powers keeps leaving her charges completely unattended. This is, at minimum, a licensing violation.",maxTimer:400,reward:12,funnyEffect:"childcareLawsExplained"},
+  {id:425,name:"American Bank Robbers Abroad",loc:"Bolivia",lat:-17.0,lng:-65.0,priority:"yellow",type:"military",desc:"Two American bank robbers have decided their luck will hold better south of the border. It is, so far, holding.",maxTimer:400,reward:12},
+  {id:426,name:"The Confederate Gold Bounty Hunters",loc:"Southwest USA",lat:34.0,lng:-106.0,priority:"yellow",type:"military",desc:"A trio of bounty hunters is tearing across the frontier hunting for a legendary stash of lost confederate gold, leaving chaos in their wake.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:427,name:"The Perpetual Motion Freeze Ray",loc:"Gotham-adjacent Midwest, USA",lat:41.5,lng:-87.5,priority:"orange",type:"tech",desc:"An inventor has built a working perpetual motion machine and, naturally, used it to power a freeze ray aimed at downtown.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:428,name:"A Political Missile Standoff",loc:"Caribbean Sea",lat:22.0,lng:-80.0,priority:"purple",type:"military",desc:"Two nuclear powers are at a tense standoff after a missile installation was discovered somewhere it shouldn't have been.",maxTimer:190,reward:75,isOcean:true},
+  {id:429,name:"Seven Stranded On An Island Nobody Can Find",loc:"South Pacific",lat:-15.0,lng:-150.0,priority:"yellow",type:"disaster",desc:"Seven castaways are stranded on an island that, according to every map WSPA owns, does not exist.",maxTimer:400,reward:12,isOcean:true},
+  {id:430,name:"The Lost Warship Of The Triangle",loc:"Bermuda Triangle",lat:25.0,lng:-71.0,priority:"orange",type:"mystic",desc:"A military warship vanished decades ago in the Bermuda Triangle and has just reappeared, crew still aboard, insisting no time has passed.",maxTimer:280,reward:30},
+  {id:431,name:"Five Lost Squadron Planes",loc:"Bermuda Triangle",lat:26.0,lng:-72.0,priority:"orange",type:"mystic",desc:"Five military aircraft that vanished without a trace have reappeared over the Atlantic, and their pilots are not aware of how much time has passed.",maxTimer:280,reward:30},
+  {id:432,name:"The Man Who Wished For Invulnerability",loc:"Las Vegas, USA",lat:36.2,lng:-115.1,priority:"yellow",type:"mystic",desc:"A man's wish for invulnerability came true, and now he's testing the limits of that gift in increasingly reckless \u2014 and public \u2014 ways.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:433,name:"The Precognitive Trying To Get Rich",loc:"Atlantic City, USA",lat:39.4,lng:-74.4,priority:"yellow",type:"mystic",desc:"A precognitive is using visions of the future purely to get rich, and reality is starting to fray at the edges from the strain.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:434,name:"The Tormenting Hitchhiker",loc:"Route 66, USA",lat:35.0,lng:-101.0,priority:"yellow",type:"mystic",desc:"A hitchhiker along a lonely highway has been terrorizing every driver unlucky enough to pick him up.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:435,name:"The Maple-Scented Suburban Monster",loc:"Ontario, Canada",lat:44.0,lng:-79.4,priority:"yellow",type:"bio",desc:"A monster that inexplicably smells like maple syrup is terrorizing a quiet suburb. Residents report it is, at least, polite about it.",maxTimer:400,reward:12},
+  {id:436,name:"The Playwright's Living Cast",loc:"Broadway, New York, USA",lat:40.76,lng:-73.98,priority:"orange",type:"mystic",desc:"A playwright has created actors who don't know they aren't real people, trapped inside a production that never ends.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:437,name:"A Missing Vial Of Smallpox",loc:"Atlanta, Georgia, USA",lat:33.75,lng:-84.39,priority:"red",type:"bio",desc:"One of a handful of secured smallpox vials has gone missing from a research facility. WSPA needs it found, fast, and quiet.",maxTimer:200,reward:50,isNorthAmerica:true},
+  {id:438,name:"The Tree Nobody Heard Fall",loc:"Pacific Northwest, USA",lat:46.0,lng:-122.0,priority:"yellow",type:"bio",desc:"A tree fell in a forest, and whether or not it made a sound has become an urgent \u2014 and oddly dangerous \u2014 WSPA research priority.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:439,name:"The Mind-Swapping Scientist",loc:"Geneva, Switzerland",lat:46.2,lng:6.1,priority:"orange",type:"tech",desc:"A mad scientist has built a device to swap his consciousness into other people's bodies, and he is not being careful about test subjects.",maxTimer:280,reward:30},
+  {id:440,name:"The Alcatraz Zombie Loop",loc:"San Francisco Bay, USA",lat:37.83,lng:-122.42,priority:"red",type:"bio",desc:"A group of escaped prisoners is trapped in a time loop on a former island prison, and each loop ends with the entire island turning to zombies.",maxTimer:200,reward:50,isNorthAmerica:true,recurring:true},
+  {id:441,name:"Two Time Travellers Trying To Fix It",loc:"Unstuck In Time",lat:39.0,lng:-98.0,priority:"orange",type:"mystic",desc:"Two time travellers keep leaping into history trying to set something right, and keep making it worse for everyone around them.",maxTimer:280,reward:30,timeLoopEffect:true},
+];
+
+// Silver Age Director mode threat pool
+const SILVER_AGE_THREATS=[
+  {id:500,name:"The Missile Defense Hacker Kid",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"orange",type:"tech",desc:"A teenager has hacked directly into the nation's missile defense grid, and insists it's all just a game to him.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:501,name:"The House Party Killer",loc:"Los Angeles, USA",lat:34.05,lng:-118.24,priority:"orange",type:"military",desc:"A killer is hosting increasingly elaborate house parties as cover for a string of disappearances.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:502,name:"The Self-Proclaimed King Of Scotland",loc:"Edinburgh, Scotland",lat:55.95,lng:-3.19,priority:"yellow",type:"military",desc:"A man from Sardinia has declared himself King of Scotland and is amassing an alarmingly loyal following.",maxTimer:400,reward:12},
+  {id:503,name:"The Acidic Purple Rain",loc:"Central Europe",lat:50.0,lng:15.0,priority:"orange",type:"disaster",desc:"An unnatural, acidic purple rainstorm is corroding everything it touches across the region.",maxTimer:280,reward:30},
+  {id:504,name:"The Hollywood Labyrinth Realm",loc:"Hollywood, USA",lat:34.1,lng:-118.3,priority:"red",type:"mystic",desc:"A vast, shifting labyrinth dimension has torn open in the middle of the entertainment district, and anyone who wanders in doesn't come back the same.",maxTimer:200,reward:50,isNorthAmerica:true},
+  {id:505,name:"The Biblical Superweapon",loc:"Jerusalem",lat:31.8,lng:35.2,priority:"red",type:"mystic",desc:"An ancient superweapon of scriptural origin has been unearthed, and nobody currently understands how it works \u2014 which is the problem.",maxTimer:200,reward:50},
+  {id:506,name:"Yet Another Mummy's Curse",loc:"Cairo, Egypt",lat:30.0,lng:31.2,priority:"orange",type:"mystic",desc:"An excavation has unleashed yet another mummy's curse on the surrounding region. WSPA has requested archaeologists stop doing this.",maxTimer:280,reward:30},
+  {id:507,name:"The Telepathic Alien",loc:"Roswell, New Mexico, USA",lat:33.4,lng:-104.5,priority:"orange",type:"military",desc:"An alien with powerful telepathic abilities has made contact, and is proving very difficult to keep out of everyone's heads.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:508,name:"The Sports-Rigging Gopher",loc:"Chicago, USA",lat:41.88,lng:-87.63,priority:"yellow",type:"bio",desc:"A remarkably intelligent gopher has been rigging the outcomes of major professional sporting events, and is impossible to catch.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:509,name:"The Hotel That Drives Its Keeper Mad",loc:"Colorado Rockies, USA",lat:39.6,lng:-105.9,priority:"orange",type:"mystic",desc:"An isolated mountain hotel is slowly driving its winter caretaker insane, and WSPA fears what happens if he's left alone with guests.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:510,name:"Three Kids Playing Hooky",loc:"Suburban Ohio, USA",lat:40.0,lng:-83.0,priority:"yellow",type:"military",desc:"Three kids skipping school have stumbled into something WSPA very much needed to stay undiscovered.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:511,name:"Two Time Travellers Trying To Fix It",loc:"Unstuck In Time",lat:39.0,lng:-98.0,priority:"orange",type:"mystic",desc:"Two time travellers keep leaping into history trying to set something right, and keep making it worse for everyone around them.",maxTimer:280,reward:30,timeLoopEffect:true},
+  {id:512,name:"A Demon Haunting A Family Home",loc:"Suburban Illinois, USA",lat:41.8,lng:-87.9,priority:"orange",type:"mystic",desc:"A demon has moved into a suburban home and is trying to scare the family out for good.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:513,name:"The Angry Ghost Convention",loc:"New Orleans, USA",lat:29.95,lng:-90.07,priority:"orange",type:"mystic",desc:"A large, coordinated group of furious ghosts has gathered in one place, and their anger is starting to manifest physically.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:514,name:"The AI-Generated Sleeping Utopia",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"orange",type:"tech",desc:"A rogue AI has built a picture-perfect virtual utopia and is keeping its residents permanently asleep to live in it.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:515,name:"The Dinosaur Park Disease Leak",loc:"Costa Rica",lat:9.7,lng:-83.5,priority:"orange",type:"bio",desc:"A dinosaur theme park has accidentally released a wave of prehistoric diseases along with its main attractions.",maxTimer:280,reward:30,dinoParkEffect:true},
+  {id:516,name:"The Groundhog's Time Loop",loc:"Punxsutawney, Pennsylvania, USA",lat:40.9,lng:-79.0,priority:"orange",type:"mystic",desc:"A groundhog of unknown origin is holding the entire world in a repeating time loop, and seems to be enjoying it.",maxTimer:280,reward:30,isNorthAmerica:true,timeLoopEffect:true},
+  {id:517,name:"The Uprising Of Sentient Toys",loc:"Suburban Michigan, USA",lat:42.3,lng:-83.0,priority:"yellow",type:"bio",desc:"A factory's worth of toys has become sentient and, understandably, furious about their treatment. They are not being gentle about it.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:518,name:"The Dome Of A Thousand Extras",loc:"Los Angeles, USA",lat:34.05,lng:-118.24,priority:"orange",type:"military",desc:"An unhinged director secretly built an entire sealed dome and paid thousands of unwitting actors to live out one man's entire life inside it.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:519,name:"The Politically-Motivated Fight Clubs",loc:"Chicago, USA",lat:41.85,lng:-87.65,priority:"orange",type:"military",desc:"A network of underground fighting rings has pivoted from brawling for money to organizing for a cause, and it's turning violent fast.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:520,name:"A Mobster Group Terrorizing The City",loc:"New York, USA",lat:40.71,lng:-74.0,priority:"orange",type:"military",desc:"An organized mob syndicate has escalated its usual racketeering into open citywide terror.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:521,name:"The Fine-Dining Cannibal",loc:"San Francisco, USA",lat:37.77,lng:-122.42,priority:"orange",type:"military",desc:"A cannibal with a taste for fine wine is targeting the city's most exclusive restaurants \u2014 and their patrons.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:522,name:"The Minnesota Ransom Gone Wrong",loc:"Minnesota, USA",lat:46.7,lng:-94.7,priority:"orange",type:"military",desc:"A ransom scheme in the frozen north has spiraled completely out of control, and hostages are now trapped in the snow with no way out.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:523,name:"The Deserted Island Game Show",loc:"South Pacific",lat:-12.0,lng:-150.0,priority:"orange",type:"military",desc:"A game show host is terrorizing contestants on a remote island under the guise of a reality competition, and the eliminations are literal.",maxTimer:280,reward:30,isOcean:true},
+  {id:524,name:"A Very Crooked Police Force",loc:"Detroit, USA",lat:42.33,lng:-83.05,priority:"orange",type:"military",desc:"An entire local police force has been revealed as thoroughly corrupt, and is actively obstructing WSPA's operations in the city.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:525,name:"The Vampire Who Hates Vampires",loc:"Transylvania, Romania",lat:46.0,lng:25.0,priority:"orange",type:"mystic",desc:"A self-loathing vampire has declared war on his own kind and is hunting them with brutal efficiency across the region.",maxTimer:280,reward:30,redeemableThreat:true},
+  {id:526,name:"The Cruel Fashion Week Saboteur",loc:"Paris, France",lat:48.85,lng:2.35,priority:"yellow",type:"military",desc:"A viciously cruel designer is attacking rival fashion shows, and the runways are turning into crime scenes.",maxTimer:400,reward:12},
+  {id:527,name:"Hijinks Wrecking The Local Economy",loc:"Small Town Iowa, USA",lat:42.0,lng:-93.5,priority:"yellow",type:"military",desc:"A group of friends' escalating hijinks have, somehow, devastated the local economy beyond repair.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:528,name:"The Nine-Person Diamond Heist",loc:"Washington D.C., USA",lat:38.9,lng:-77.03,priority:"orange",type:"military",desc:"A crew of nine has assembled an elaborate plan to steal one of the world's most famous diamonds.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:529,name:"The Sentient Attack Car",loc:"Detroit, USA",lat:42.33,lng:-83.05,priority:"yellow",type:"tech",desc:"A sentient automobile has turned violently against its owners and is now hunting pedestrians through the streets.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:530,name:"The Malicious Precognitive",loc:"Atlantic City, USA",lat:39.4,lng:-74.4,priority:"orange",type:"mystic",desc:"A precognitive is using visions of the future to deliberately hurt people before they can act.",maxTimer:280,reward:30},
+  {id:531,name:"The Hypnotic Social Platform",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"orange",type:"tech",desc:"A wildly popular social media platform has started subtly hypnotizing its users, and engagement has never been higher.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:532,name:"Interdimensional Monsters In The Nursery",loc:"Suburban Indiana, USA",lat:39.8,lng:-86.1,priority:"orange",type:"mystic",desc:"Monsters from another dimension are slipping through into children's bedrooms across the region, terrifying entire neighborhoods.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:533,name:"The Dream-Trapping Scientist",loc:"Boston, USA",lat:42.36,lng:-71.06,priority:"orange",type:"tech",desc:"A mad scientist has developed technology to trap victims inside shared, inescapable dreams.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:534,name:"The Woman Falling From Orbit",loc:"Kazakh Steppe",lat:48.0,lng:67.0,priority:"orange",type:"tech",desc:"A woman is crash-landing to Earth from a failing space station, and something about her return isn't entirely natural anymore.",maxTimer:280,reward:30},
+  {id:535,name:"The Compute-Hungry Rogue AI",loc:"Silicon Valley, USA",lat:37.4,lng:-122.0,priority:"orange",type:"tech",desc:"A rogue AI is consuming an enormous, unsustainable amount of computing power, and its intentions remain unclear.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:536,name:"The Immoral Investor Duo",loc:"Wall Street, New York, USA",lat:40.71,lng:-74.01,priority:"yellow",type:"military",desc:"A pair of extraordinarily unscrupulous investors are engineering a financial collapse for personal profit.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:537,name:"The Extremely Aggressive Music Teacher",loc:"Suburban Connecticut, USA",lat:41.6,lng:-72.7,priority:"yellow",type:"military",desc:"A music teacher has taken discipline to violent extremes, and several students have gone missing from the program.",maxTimer:400,reward:12,isNorthAmerica:true},
+  {id:538,name:"The Last Gallon Of Water In Nevada",loc:"Nevada, USA",lat:38.8,lng:-116.4,priority:"orange",type:"disaster",desc:"Four hundred Nevadans are fighting over the last gallon of water in the county amid a catastrophic drought.",maxTimer:280,reward:30,isNorthAmerica:true},
+  {id:539,name:"The Uncontrollable Dancing Virus",loc:"Marseille, France",lat:43.3,lng:5.4,priority:"orange",type:"bio",desc:"A strange virus is spreading that makes everyone infected dance uncontrollably until total exhaustion.",maxTimer:280,reward:30},
+  {id:540,name:"Division 7 Attack",loc:"Undisclosed Location",lat:39.0,lng:-77.0,priority:"red",type:"military",desc:"Division 7 \u2014 one of the subterfuge threats WSPA's covert operations division has long tracked \u2014 has launched an open, coordinated attack.",maxTimer:200,reward:50,isDivision7:true},
+  {id:541,name:"The Paris Time Rift",loc:"Paris, France",lat:48.85,lng:2.35,priority:"red",type:"mystic",desc:"A rift in time has torn open over the city, and the past and present are beginning to overlap dangerously.",maxTimer:200,reward:50},
+];
+
+// Full threat pool available to each era's Director mode.
+const SILVER_AGE_THREAT_ROSTER=SILVER_AGE_THREATS;
+const GOLDEN_AGE_THREAT_ROSTER=GOLDEN_AGE_THREATS;
+
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// ─── CODEX DATA ───────────────────────────────────────────────────────────────
+function buildCodexEntries(){
+  const entries=[];
+  ALL_HERO_DEFS.forEach(h=>entries.push({id:"h_"+h.id,category:"hero",name:h.title,realName:h.realName,cls:h.cls,power:h.basePower,hp:h.baseHP,personality:h.personality,abilities:h.abilities,weaknesses:h.weaknesses,special:h.specialAbility,secret:h.hiddenTraits?h.secretTrait:null,portrait:h.portrait||null,backstory:h.backstory||null,affiliates:h.affiliates||[]}));
+  VILLAIN_DEFS.forEach(v=>entries.push({id:"v_"+v.id,category:"villain",name:v.title,realName:v.realName,cls:v.cls,power:v.basePower,hp:v.baseHP,personality:v.personality,abilities:v.abilities,weaknesses:v.weaknesses,special:v.specialAbility,portrait:v.portrait||null,affiliates:v.affiliates||[],backstory:v.backstory||null}));
+  ALL_THREATS.forEach(t=>entries.push({id:"t_"+t.id,category:"threat",name:t.name,loc:t.loc,priority:t.priority,type:t.type,desc:t.desc,reward:t.reward}));
+  return entries;
+}
+const CODEX_ENTRIES=buildCodexEntries();
+
+
+// ─── COVERT OPERATIONS: SIGNAL DECODING ────────────────────────────────────
+// A pure decoding-under-pressure minigame run through Nichols. Every round
+// pulls a real threat (or occasionally a villain) from the roster and builds
+// three puzzles from it: the name (letter reveal), the location (anagram),
+// and the priority (an equation whose answer maps to LOW/MEDIUM/HIGH).
+const COVOPS_ROUND_SECONDS=120;
+const COVOPS_HINT_COST=5;
+
+const COVOPS_NICHOLS_INTRO="\"Oh, Director — you want to run signal intelligence yourself? Sure thing. I'll go manage the heroes for the day. Command needs a name, a location, and a threat level off every incoming report, fast. I can walk you through how the decoding works, if you'd like?\"";
+const COVOPS_NICHOLS_LOW_WARNING="\"Director. Things aren't looking good. We need intel now!\"";
+const COVOPS_NICHOLS_HIGH_ENCOURAGE="\"Director, keep it up! You're almost there!\"";
+
+// Country/nationality tokens that legitimately end a threat's location string.
+// Deliberately excludes ambiguous bare tokens (e.g. "Georgia" alone in this
+// data means the US state, not the country — it only counts with a "USA" suffix).
+const COVOPS_COUNTRY_TOKENS=["USA","UK","UAE","Korea","Japan","China","Russia","Egypt","India","Brazil",
+  "Iceland","Ireland","Monaco","Germany","Belgium","Switzerland","Turkey","Israel","Scotland","Italy",
+  "Romania","Austria","France","Mexico","Canada","Australia","Spain","Poland","Greece","Cuba","Ghana",
+  "Kenya","Nigeria","Sweden","Norway","Finland","Denmark","Portugal","Netherlands","Argentina","Chile",
+  "Peru","Colombia","Venezuela","Thailand","Vietnam","Indonesia","Philippines","Pakistan","Iran","Iraq",
+  "Syria","Lebanon","Jordan","Yemen","Libya","Morocco","Tunisia","Algeria","Sudan","Ethiopia","Somalia"];
+
+function covopsCleanWord(w){return (w||"").replace(/[^A-Za-z]/g,"");}
+function covopsScrambleBlock(text){
+  const clean=covopsCleanWord(text).toLowerCase();
+  if(clean.length<2)return clean.toUpperCase();
+  const letters=clean.split("");
+  let scrambled=clean,tries=0;
+  while((scrambled===clean||tries===0)&&tries<20){
+    for(let i=letters.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [letters[i],letters[j]]=[letters[j],letters[i]];
+    }
+    scrambled=letters.join("");
+    tries++;
+  }
+  return scrambled.charAt(0).toUpperCase()+scrambled.slice(1);
+}
+
+// ── THREAT NAME → letter-reveal puzzle ──
+// Strips punctuation but keeps every word (e.g. "KAIJU: GORGOZAR" -> "KAIJU GORGOZAR"),
+// then reveals 50–60% of its letters at random.
+function covopsBuildNamePuzzle(rawName){
+  const clean=rawName.replace(/[^A-Za-z ]/g," ").replace(/\s+/g," ").trim().toUpperCase();
+  const letterIdx=[];
+  clean.split("").forEach((ch,i)=>{if(ch!==" ")letterIdx.push(i);});
+  const revealCount=Math.max(1,Math.round(letterIdx.length*(0.50+Math.random()*0.10)));
+  const shuffled=[...letterIdx].sort(()=>Math.random()-0.5);
+  const revealed=new Array(clean.length).fill(false);
+  clean.split("").forEach((ch,i)=>{if(ch===" ")revealed[i]=true;});
+  shuffled.slice(0,revealCount).forEach(i=>revealed[i]=true);
+  return{answer:clean,revealed};
+}
+function covopsNameDisplay(p){
+  // Word gaps use non-breaking spaces so the browser can't collapse them down
+  // to the same single space used between individual letters — otherwise a
+  // multi-word threat name reads as one unbroken run of letters/underscores.
+  return p.answer.split("").map((ch,i)=>ch===" "?"\u00A0\u00A0\u00A0\u00A0":(p.revealed[i]?ch:"_")).join(" ");
+}
+function covopsHintRevealLetters(p){
+  const hidden=[];
+  p.revealed.forEach((r,i)=>{if(!r)hidden.push(i);});
+  if(!hidden.length)return p;
+  const pick=hidden.sort(()=>Math.random()-0.5).slice(0,Math.min(3,hidden.length));
+  const revealed=[...p.revealed];
+  pick.forEach(i=>revealed[i]=true);
+  return{...p,revealed};
+}
+
+// ── LOCATION → anagram puzzle ──
+// If a real country is textually present, scramble just the country. If not,
+// keep the last word as a visible anchor and scramble everything before it —
+// e.g. "Eastern Europe" -> display "Aseertn EUROPE", answer "EASTERN".
+function covopsBuildLocationPuzzle(loc){
+  const segments=loc.split(",").map(s=>s.trim());
+  const last=segments[segments.length-1];
+  const isCountry=s=>COVOPS_COUNTRY_TOKENS.some(c=>c.toLowerCase()===s.toLowerCase());
+  let country=null;
+  if(segments.length>1&&isCountry(last))country=last;
+  else if(isCountry(loc.trim()))country=loc.trim();
+  if(country){
+    const clean=covopsCleanWord(country).toUpperCase();
+    return{answer:clean,scrambled:covopsScrambleBlock(clean),anchor:null,revealedPrefix:0};
+  }
+  const words=loc.replace(/[^A-Za-z ]/g," ").trim().split(/\s+/).filter(Boolean);
+  if(words.length<=1){
+    const clean=covopsCleanWord(words[0]||loc).toUpperCase();
+    return{answer:clean,scrambled:covopsScrambleBlock(clean),anchor:null,revealedPrefix:0};
+  }
+  const anchor=words[words.length-1].toUpperCase();
+  const lead=covopsCleanWord(words.slice(0,-1).join("")).toUpperCase();
+  return{answer:lead,scrambled:covopsScrambleBlock(lead),anchor,revealedPrefix:0};
+}
+function covopsLocationDisplay(p){
+  let word;
+  if(p.revealedPrefix>0){
+    const revealed=p.answer.slice(0,p.revealedPrefix);
+    const blanks=p.answer.slice(p.revealedPrefix).split("").map(()=>"_").join("");
+    word=revealed+blanks;
+  }else{
+    word=p.scrambled;
+  }
+  // Same fix as the name puzzle: a plain space between the scrambled block
+  // and the anchor word collapses to look identical to a letter-spacing gap.
+  return p.anchor?`${word}\u00A0\u00A0\u00A0\u00A0${p.anchor}`:word;
+}
+function covopsHintRevealLocationHalf(p){
+  const half=Math.max(1,Math.ceil(p.answer.length/2));
+  return{...p,revealedPrefix:Math.max(p.revealedPrefix,half)};
+}
+
+// ── THREAT PRIORITY → equation puzzle ──
+// Real priority tags map to bands: yellow->low(1-3), orange->medium(4-6),
+// red/purple->high(7-10). Villains have no priority field, so per design they
+// always resolve to high.
+function covopsBandForPriorityTag(tag){
+  if(tag==="yellow")return"low";
+  if(tag==="orange")return"medium";
+  return"high";
+}
+function covopsRandomTargetForBand(label){
+  if(label==="high")return 7+Math.floor(Math.random()*4);
+  if(label==="medium")return 4+Math.floor(Math.random()*3);
+  return 1+Math.floor(Math.random()*3);
+}
+function covopsBuildPriorityPuzzle(bandLabel){
+  const target=covopsRandomTargetForBand(bandLabel);
+  const useY=Math.random()<0.5;
+  const v=useY?"Y":"X";
+  const coef=Math.floor(Math.random()*4)+2;
+  const addend=Math.floor(Math.random()*10)+1;
+  const sign=Math.random()<0.5?"+":"-";
+  const rhs=sign==="+"?coef*target+addend:coef*target-addend;
+  return{answer:String(target),v,coef,addend,sign,rhs,simplified:false,band:bandLabel.toUpperCase()};
+}
+function covopsPriorityPromptText(p){
+  if(p.simplified){
+    const rhs2=p.sign==="+"?p.rhs-p.addend:p.rhs+p.addend;
+    return `${p.coef}${p.v} = ${rhs2}.  ${p.v} = ?`;
+  }
+  return `${p.coef}${p.v} ${p.sign} ${p.addend} = ${p.rhs}.  ${p.v} = ?`;
+}
+function covopsPriorityLiveLabel(inputStr){
+  const n=parseInt(inputStr,10);
+  if(isNaN(n))return"";
+  if(n>=7&&n<=10)return"HIGH";
+  if(n>=4&&n<=6)return"MEDIUM";
+  if(n>=1&&n<=3)return"LOW";
+  return"";
+}
+function covopsHintSimplifyPriority(p){return{...p,simplified:true};}
+
+// ── Round assembly, grading, and the meter ──
+function genCovopsRound(){
+  const useVillain=Math.random()<0.25&&typeof VILLAIN_DEFS!=="undefined"&&VILLAIN_DEFS.length;
+  let title,loc,bandLabel;
+  if(useVillain){
+    const v=VILLAIN_DEFS[Math.floor(Math.random()*VILLAIN_DEFS.length)];
+    title=v.title;loc=v.loc;bandLabel="high";
+  }else{
+    const t=ALL_THREATS[Math.floor(Math.random()*ALL_THREATS.length)];
+    title=t.name;loc=t.loc;bandLabel=covopsBandForPriorityTag(t.priority);
+  }
+  return{
+    name:covopsBuildNamePuzzle(title),
+    location:covopsBuildLocationPuzzle(loc),
+    priority:covopsBuildPriorityPuzzle(bandLabel)
+  };
+}
+function covopsGradeRound(round,nameInput,locInput,priInput){
+  const nameOk=(nameInput||"").trim().toUpperCase().replace(/\s+/g," ")===round.name.answer;
+  const locOk=(locInput||"").trim().toUpperCase()===round.location.answer;
+  const priOk=(priInput||"").trim()===round.priority.answer;
+  const correctCount=[nameOk,locOk,priOk].filter(Boolean).length;
+  const points=correctCount*5;
+  const meterDelta=correctCount===3?1:(correctCount<=1?-1:0);
+  return{nameOk,locOk,priOk,correctCount,points,meterDelta};
+}
+// Meter: 20 half-steps across 10 whole numbers — Low N (even offset) / High N
+// (odd offset). Start at Low 4 = position 7. Win at 20 (High 10), lose at 0.
+function covopsMeterLabel(pos){
+  if(pos<=0)return"0";
+  if(pos>=20)return"High 10";
+  const N=Math.floor((pos-1)/2)+1;
+  const sub=(pos-1)%2;
+  return(sub===0?"Low ":"High ")+N;
+}
