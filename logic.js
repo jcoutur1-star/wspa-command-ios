@@ -3,8 +3,22 @@ function sc(v,m){const p=v/m;return p>0.6?"#33ff88":p>0.3?"#ffaa00":"#ff3333";}
 function clsColor(cls){return cls==="tank"?"#4488ff":cls==="support"?"#44ff88":"#ff8844";}
 function threatColor(t){return P_COLORS[t.priority]||"#ffaa00";}
 
+// ── CAREER BONUS ──────────────────────────────────────────────────────────────
+// Roster/base stats already have the hero's *starting* rank baked into the lore.
+// So the career multiplier is only the GAIN over that starting rank:
+//   Veteran start      -> no bonus (already factored in)
+//   Intermediate start -> gets the Veteran bonus once they level up
+//   Beginner start     -> gets Intermediate, then Veteran bonus as they level up
+// startCareer is stamped on each hero when the roster is built; if it is missing
+// (older saves / ad-hoc heroes) we fall back to the current rank (= no bonus).
+function careerMult(hero){
+  const cur=CAREER[hero.career]?.mult||1;
+  const start=CAREER[hero.startCareer||hero.career]?.mult||cur;
+  return cur/start;
+}
+
 function effStats(hero,rom,dis){
-  const m=CAREER[hero.career]?.mult||1;
+  const m=careerMult(hero);
   let power=hero.basePower*m;
   if(hero._corvairBuff)power+=0.5;
   if(hero._ironsideAura)power+=0.3;
@@ -148,7 +162,7 @@ function rollMission(heroes,threat,rom,dis){
     const affected=rogueMembers.map(r=>r.title);
     // Build Resistance Score (R)
     let R=rogueMembers.reduce((sum,r)=>{
-      const m=CAREER[r.career]?.mult||1;
+      const m=careerMult(r);
       let p=r.basePower*m;
       // Conviction bonus: rogue member whose affiliate is also rogue
       if((r.affiliates||[]).some(aff=>affected.includes(aff)))p*=1.15;
@@ -161,7 +175,7 @@ function rollMission(heroes,threat,rom,dis){
     if(johnInRogue)return Math.random()<0.01?"success":"failure";
     // Build Suppression Score (S)
     const S=heroes.reduce((sum,h)=>{
-      const m=CAREER[h.career]?.mult||1;
+      const m=careerMult(h);
       let p=h.basePower*m;
       // Relationship penalty: deployed hero has a rogue member in their affiliates
       if((h.affiliates||[]).some(aff=>affected.includes(aff)))p*=0.75;
@@ -284,7 +298,7 @@ function calcDmgRaw(outcome,hero,threat,allDeployed){
 
   // ── The Phi Am: ×1.2 damage to heroes below 50% health ──
   if(threat&&threat.phiAmEffect){
-    const m=CAREER[hero.career]?.mult||1;
+    const m=careerMult(hero);
     const approxMaxHP=Math.round(hero.baseHP*m)+(hero.mechaBonus||0);
     const base=outcome==="success"?[5,18]:outcome==="partial"?[15,28]:[28,45];
     const raw=Math.floor(Math.random()*(base[1]-base[0])+base[0]);
@@ -355,7 +369,7 @@ function computeMissionSuccessPercent(heroes,threat,rom,dis){
     const rogueMembers=threat.rogueMembers||[];
     const affected=rogueMembers.map(r=>r.title);
     let R=rogueMembers.reduce((sum,r)=>{
-      const m=CAREER[r.career]?.mult||1;
+      const m=careerMult(r);
       let p=r.basePower*m;
       if((r.affiliates||[]).some(aff=>affected.includes(aff)))p*=1.15;
       return sum+p;
@@ -364,7 +378,7 @@ function computeMissionSuccessPercent(heroes,threat,rom,dis){
     if(johnInRogue)R*=3.5;
     if(johnInRogue)return 1; // flat 1% success roll, no partial outcome
     const S=heroes.reduce((sum,h)=>{
-      const m=CAREER[h.career]?.mult||1;
+      const m=careerMult(h);
       let p=h.basePower*m;
       if((h.affiliates||[]).some(aff=>affected.includes(aff)))p*=0.75;
       return sum+p;
