@@ -52,11 +52,14 @@ function WorldMap({threats,depMap,score,target,tierLabel,zoom,pan,onZoomIn,onZoo
 
   return React.createElement("div",{className:"map-area",style:{position:"relative",overflow:"hidden"}},
     React.createElement("div",{
-      style:{transform:`scale(${zoom}) translate(${localPan.x/zoom}px,${localPan.y/zoom}px)`,transformOrigin:"center center",width:"100%",height:"100%",cursor:dragging?"grabbing":"grab"},
+      style:{transform:`scale(${zoom}) translate(${localPan.x/zoom}px,${localPan.y/zoom}px)`,transformOrigin:"center center",width:"100%",height:"100%",cursor:dragging?"grabbing":"grab",touchAction:"none"},
       onMouseDown:e=>{setDragging(true);setDragStart({x:e.clientX-localPan.x,y:e.clientY-localPan.y});},
       onMouseMove:e=>{if(!dragging||!dragStart)return;setLocalPan({x:e.clientX-dragStart.x,y:e.clientY-dragStart.y});},
       onMouseUp:()=>{setDragging(false);setDragStart(null);},
-      onMouseLeave:()=>{setDragging(false);setDragStart(null);}
+      onMouseLeave:()=>{setDragging(false);setDragStart(null);},
+      onTouchStart:e=>{if(e.touches.length!==1)return;const t=e.touches[0];setDragging(true);setDragStart({x:t.clientX-localPan.x,y:t.clientY-localPan.y});},
+      onTouchMove:e=>{if(!dragging||!dragStart||e.touches.length!==1)return;const t=e.touches[0];setLocalPan({x:t.clientX-dragStart.x,y:t.clientY-dragStart.y});},
+      onTouchEnd:()=>{setDragging(false);setDragStart(null);}
     },
     React.createElement("svg",{ref:svgRef,className:"map-svg",viewBox:`0 0 ${W} ${H}`,xmlns:"http://www.w3.org/2000/svg"},
       React.createElement("defs",null,
@@ -138,7 +141,7 @@ function setBgTrack(screen){
   if(!bgMusicMuted)bgMusic.play().catch(()=>{});
 }
 // Browsers block autoplay until a user gesture — retry once one happens.
-["click","keydown"].forEach(evt=>document.addEventListener(evt,()=>{
+["click","keydown","touchend"].forEach(evt=>document.addEventListener(evt,()=>{
   if(bgMusic.paused&&!bgMusicMuted)bgMusic.play().catch(()=>{});
 }));
 // Small fixed mute toggle, built with plain DOM so it renders above every screen
@@ -210,6 +213,14 @@ function App(){
   const t1SpawnedRef=useRef(false);
   const t2SpawnedRef=useRef(false);
   const t3SpawnedRef=useRef(false);
+  // ─── BOTTOM-CENTER DOCK (PR / Medical / Top Runs / Bonding) ───
+  const [dockTab,setDockTab]=useState("pr"); // PR is always the first tab shown
+  useEffect(()=>{
+    if(!tutorialActive)return;
+    if(tutorialStep==="hospital")setDockTab("medical");
+    else if(tutorialStep==="bonding_mention")setDockTab("bonding");
+    else setDockTab("pr");
+  },[tutorialActive,tutorialStep]);
 
   const [heroes,setHeroes]=useState([]);
   const [villains,setVillains]=useState([]);
@@ -305,7 +316,7 @@ function App(){
       const base=VILLAIN_DEFS.find(v=>v.title==="Silphana");
       if(!base)return prev;
       const{maxHP}=effStats({...base,status:"ready"},romRef.current,disRef.current);
-      return[...prev,{...base,currentHP:maxHP,status:"ready",xp:0,levelUpFlash:false,speechBubble:null,
+      return[...prev,{...base,startCareer:base.career,currentHP:maxHP,status:"ready",xp:0,levelUpFlash:false,speechBubble:null,
         romancePartner:null,redeemed:true,gameLocked:false,
         romanceStatus:"Dating Deputy Director George Nichols",romanceLocked:true}];
     });
@@ -689,7 +700,7 @@ function App(){
       const isGameLocked=h.gameLocked||isHotLocked;
       const status=isShopLocked?"shopLocked":isGameLocked?"gameLocked":"ready";
       const{maxHP}=effStats({...h,status:"ready"},{},{});
-      return{...h,currentHP:maxHP,status,regenTimer:0,xp:0,levelUpFlash:false,speechBubble:null,romancePartner:null};
+      return{...h,startCareer:h.career,currentHP:maxHP,status,regenTimer:0,xp:0,levelUpFlash:false,speechBubble:null,romancePartner:null};
     });
     // Silphana's redemption is a one-time story arc, not a per-run John dice roll — once
     // completed via Heroes of Tomorrow she's a permanent hero on every future roster.
@@ -698,7 +709,7 @@ function App(){
       const sBase=VILLAIN_DEFS.find(v=>v.title==="Silphana");
       if(sBase){
         const{maxHP}=effStats({...sBase,status:"ready"},{},{});
-        base.push({...sBase,currentHP:maxHP,status:"ready",regenTimer:0,xp:0,levelUpFlash:false,speechBubble:null,
+        base.push({...sBase,startCareer:sBase.career,currentHP:maxHP,status:"ready",regenTimer:0,xp:0,levelUpFlash:false,speechBubble:null,
           romancePartner:null,redeemed:true,gameLocked:false,
           romanceStatus:"Dating Deputy Director George Nichols",romanceLocked:true});
       }
@@ -732,7 +743,7 @@ function App(){
     setHeroPanelOpen(true);
     setThreatPanelOpen(true);
     setMapZoom(1);setMapPan({x:0,y:0});
-    setPrEvent(null);setAugustaInput("");setBondPick([]);setFrancoRankPicks([]);
+    setPrEvent(null);setAugustaInput("");setBondPick([]);setFrancoRankPicks([]);setDockTab("pr");
     prQueueRef.current=[];prUrgentQueueRef.current=[];lastPressTickRef.current=0;lastAugustaTickRef.current=0;warned30Ref.current=new Set();
     setWinTier(tier);setLog(`Welcome, Director ${n}. WSPA Command online.`);setLogTime("00:00");
     tick.current=0;
@@ -771,6 +782,7 @@ function App(){
     setMapZoom(1);setMapPan({x:0,y:0});
     setPrEvent(null);setAugustaInput("");setBondPick([]);setFrancoRankPicks([]);
     prQueueRef.current=[];prUrgentQueueRef.current=[];lastPressTickRef.current=0;lastAugustaTickRef.current=0;warned30Ref.current=new Set();
+    setDockTab("pr");
     tick.current=0;setLogTime("00:00");
     setLog(`Welcome, Director ${n}. Deputy Director Nichols is walking you through the basics.`);
     t1SpawnedRef.current=false;t2SpawnedRef.current=false;t3SpawnedRef.current=false;
@@ -1316,7 +1328,7 @@ function App(){
           setHeroes(hp=>{
             const already=hp.find(x=>x.id===villain.id);
             if(already)return hp.map(x=>x.id===villain.id?{...x,status:"resting",gameLocked:false,redeemed:true,currentHP:rdMaxHP}:x);
-            return[...hp,{...villain,currentHP:rdMaxHP,status:"resting",gameLocked:false,redeemed:true,xp:0,speechBubble:null,defeated:false}];
+            return[...hp,{...villain,startCareer:villain.career,currentHP:rdMaxHP,status:"resting",gameLocked:false,redeemed:true,xp:0,speechBubble:null,defeated:false}];
           });
         };
         cands.forEach(villain=>{
@@ -1529,7 +1541,7 @@ function App(){
           desc:"The Director has sent heroes to die. A coalition — "+councilNames+" — has formed to remove the Director from power. They leave all defeated heroes at 1 HP. They do not act from malice, but from moral conviction."+(johnInCouncil?" John is among them. This is a 99% loss for the Director.":johnIsOffworld?" John is offworld — if he returns, he will join them immediately. Without him, victory is possible but extremely difficult.":""),
           timer:300,maxTimer:300,reward:200,
           isRogueCouncil:true,leavesAt1HP:true,johnPresent:johnInCouncil,
-          rogueMembers:aliveCouncil.map(h=>({title:h.title,basePower:h.basePower,career:h.career,affiliates:h.affiliates||[],isJohn:h.isJohn||false})),
+          rogueMembers:aliveCouncil.map(h=>({title:h.title,basePower:h.basePower,career:h.career,startCareer:h.startCareer,affiliates:h.affiliates||[],isJohn:h.isJohn||false})),
           recurring:true
         };
         setThreats(p2=>[...p2.filter(x=>!x.isRogueCouncil),councilThreat]);
@@ -2457,6 +2469,149 @@ function App(){
 
   if(screen!=="game")return null;
 
+  // ── BOTTOM-CENTER DOCK (tabbed): PR is the default tab; tabs glow when they need attention ──
+  const DOCK_TABS=[{key:"pr",label:"📣 PR"},{key:"medical",label:"🏥 MEDICAL"},{key:"runs",label:"🏆 TOP RUNS"},{key:"bonding",label:"🤝 BONDING"}];
+  const tutHl=(tutorialActive&&tutorialStep)?tutorialHighlightFor(tutorialStep):"none";
+  const tutHas=n=>tutHl!=="none"&&tutHl.includes(n);
+  const tabGlow={
+    pr:!!prEvent,                       // a PR prompt is waiting (not used by the tutorial, which has its own banner)
+    medical:tutHas("hospital"),
+    runs:tutHas("leaderboard"),
+    bonding:tutHas("bonding")
+  };
+  const dockContent=dockTab==="pr"?
+React.createElement("div",{className:"pr-section dock-pr"},
+        prEvent?(()=>{
+          const spk=prEvent.speaker==="nichols"?TUTORIAL_CHARACTERS.nichols:
+                     prEvent.speaker==="cassonik"?TUTORIAL_CHARACTERS.cassonik:
+                     prEvent.speaker==="franco"?{name:"Franco",portrait:"portraits/Franco.jpg"}:
+                     {name:"Augusta Spin",portrait:"portraits/Augusta.jpg"};
+          return React.createElement(React.Fragment,null,
+            React.createElement("div",{className:"pr-portrait"},
+              React.createElement("img",{src:spk.portrait,alt:spk.name,onError:e=>{e.target.style.display="none";}})
+            ),
+            React.createElement("div",{className:"pr-content"},
+              React.createElement("div",{className:"pr-speaker-name"},spk.name),
+              React.createElement("div",{className:"pr-commentary"},prEvent.text),
+              React.createElement("div",{className:"pr-controls"},
+                prEvent.type==="franco"&&prEvent.francoType==="top5"?
+                  React.createElement(React.Fragment,null,
+                    React.createElement("div",{className:"pr-timer-note"},
+                      francoRankPicks.length?`Picked: ${francoRankPicks.map((p,i)=>`${i+1}. ${p}`).join(" · ")}`:"Pick your top 5, in order."),
+                    prEvent.options.filter(o=>!francoRankPicks.includes(o)).map((opt,i)=>
+                      React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleFrancoTop5Pick(opt)},opt)),
+                    francoRankPicks.length>=5?React.createElement("button",{className:"pr-option-btn purple",onClick:handleFrancoTop5Submit},"SUBMIT ▶"):null
+                  )
+                :prEvent.type==="franco"?
+                  prEvent.options.map((opt,i)=>React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleFrancoChoice(opt)},opt))
+                :prEvent.type==="augusta_mc"?
+                  prEvent.options.map((opt,i)=>React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleAugustaMCChoice(opt)},opt))
+                :prEvent.type==="augusta"?
+                  React.createElement(React.Fragment,null,
+                    React.createElement("input",{className:"pr-text-input",maxLength:100,placeholder:"Type your response... (100 chars)",value:augustaInput,
+                      onChange:e=>setAugustaInput(e.target.value),
+                      onKeyDown:e=>{if(e.key==="Enter")handleAugustaSubmit();}}),
+                    React.createElement("button",{className:"pr-option-btn",disabled:!augustaInput.trim(),onClick:handleAugustaSubmit},"SUBMIT ▶"),
+                    React.createElement("div",{className:"pr-timer-note"},`${Math.max(0,prEvent.deadlineTick-tick.current)}s to respond · +20 pts`)
+                  )
+                :React.createElement("button",{className:"pr-option-btn",onClick:()=>setPrEvent(null)},"COPY THAT")
+              )
+            )
+          );
+        })():React.createElement("div",{className:"pr-idle"},"◈ PUBLIC RELATIONS — awaiting updates from the field.")
+)
+  :dockTab==="medical"?
+        React.createElement("div",{className:"dock-medical hospital-panel"},
+                    React.createElement("div",{style:{fontSize:9,color:"var(--text3)",marginBottom:5}},`${hospitalIds.length}/5 beds · 7× regen · heroes unavailable`),
+          React.createElement("button",{className:"hospital-auto-btn",onClick:autoFillHospital,disabled:hospitalIds.length>=5},"⚕ AUTO-FILL WOUNDED"),
+          hospitalIds.length===0&&React.createElement("div",{style:{fontSize:9,color:"var(--text3)",fontStyle:"italic",marginTop:4}},"Medical bay empty."),
+          hospitalIds.map(id=>{
+            const h=heroes.find(x=>x.id===id);
+            if(!h)return null;
+            const{maxHP}=effStats(h,rom,dis);
+            const pct=Math.round((h.currentHP/maxHP)*100);
+            return React.createElement("div",{key:id,className:"hospital-card"},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
+                React.createElement("span",{style:{fontFamily:"var(--font-head)",fontSize:9,color:"var(--text)"}},[h.title]),
+                React.createElement("button",{className:"hospital-remove-btn",onClick:()=>removeFromHospital(id),title:"Remove from hospital"},"✕")
+              ),
+              React.createElement("div",{style:{fontSize:8,color:"var(--text3)",marginBottom:2}},`HP: ${Math.round(h.currentHP)}/${maxHP} (${pct}%)`),
+              React.createElement("div",{className:"bt",style:{marginTop:2}},React.createElement("div",{className:"bf",style:{width:`${pct}%`,background:sc(h.currentHP,maxHP)}}))
+            );
+          }),
+          heroes.filter(h=>
+            !hospitalIds.includes(h.id)&&
+            !["deployed","gameLocked","shopLocked","kia","rogue","offworld"].includes(h.status)&&
+            (()=>{const{maxHP}=effStats(h,rom,dis);return h.currentHP<maxHP;})()
+          ).length>0&&hospitalIds.length<5&&React.createElement("div",{style:{marginTop:6}},
+            React.createElement("div",{style:{fontSize:8,color:"var(--text3)",marginBottom:3}},"ADD TO MEDICAL BAY:"),
+            heroes.filter(h=>
+              !hospitalIds.includes(h.id)&&
+              !["deployed","gameLocked","shopLocked","kia","rogue","offworld"].includes(h.status)&&
+              (()=>{const{maxHP}=effStats(h,rom,dis);return h.currentHP<maxHP;})()
+            ).slice(0,6).map(h=>{
+              const{maxHP}=effStats(h,rom,dis);
+              return React.createElement("div",{key:h.id,className:"hospital-add-row",onClick:()=>addToHospital(h.id)},
+                React.createElement("span",{style:{fontSize:9,color:"var(--text2)"}},[h.title]),
+                React.createElement("span",{style:{fontSize:8,color:"var(--text3)"}},`${Math.round(h.currentHP)}/${maxHP}`)
+              );
+            })
+          )
+        )
+  :dockTab==="runs"?
+      React.createElement("div",{className:"dock-runs"},
+                React.createElement("div",{className:"highscore-list"},
+          highScores.length===0?
+            React.createElement("div",{className:"highscore-empty"},"No runs recorded yet.\nBe the first Director on the board."):
+            highScores.map((rec,i)=>React.createElement("div",{key:i,className:"highscore-row"+(i<3?` rank-${i+1}`:"")},
+              React.createElement("span",{className:"highscore-rank"},String(i+1).padStart(2,"0")),
+              React.createElement("span",{className:"highscore-name"},rec.name),
+              React.createElement("span",{className:"highscore-pts"},rec.points)
+            ))
+        )
+      )
+  :
+      (()=>{
+        const bondCandidates=heroes.filter(canDeploy);
+        const mid=Math.ceil(bondCandidates.length/2);
+        const leftHeroes=bondCandidates.slice(0,mid);
+        const rightHeroes=bondCandidates.slice(mid);
+        const seen=new Set();const pairs=[];
+        heroes.forEach(h=>{
+          if(h.status==="bonding"&&!seen.has(h.id)&&h.bondPartner!=null){
+            const partner=heroes.find(x=>x.id===h.bondPartner);
+            if(partner){seen.add(h.id);seen.add(partner.id);pairs.push([h,partner]);}
+          }
+        });
+        const heroRow=(h)=>React.createElement("button",{key:h.id,
+          className:"bonding-row"+(bondPick.includes(h.id)?" sel":""),
+          onClick:()=>setBondPick(prev=>prev.includes(h.id)?prev.filter(x=>x!==h.id):prev.length<2?[...prev,h.id]:prev)
+        },h.title);
+        const pickedNames=bondPick.map(id=>heroes.find(h=>h.id===id)?.title).filter(Boolean);
+        return React.createElement("div",{className:"dock-bonding"},
+                    // Two independently-scrolling hero lists, side by side
+          React.createElement("div",{className:"bonding-lists-row"},
+            React.createElement("div",{className:"bonding-side-col"},leftHeroes.map(heroRow)),
+            React.createElement("div",{className:"bonding-side-col"},rightHeroes.map(heroRow))
+          ),
+          // Fixed footer — status + Send button never scroll with the lists above
+          React.createElement("div",{className:"bonding-footer"},
+            pairs.length>0&&React.createElement("div",{className:"bonding-pairs-list"},
+              pairs.map(([a,b])=>{
+                const remaining=Math.max(0,BOND_DURATION-(tick.current-(a.bondStartTick||0)));
+                return React.createElement("div",{key:a.id+"-"+b.id,className:"bonding-pair-card"},`${a.title} & ${b.title} — ${remaining}s`);
+              })
+            ),
+            React.createElement("div",{className:"bonding-status-msg"},
+              pickedNames.length===0?"Select 2 heroes to send.":
+              pickedNames.length===1?`${pickedNames[0]} selected — pick 1 more.`:
+              `${pickedNames[0]} & ${pickedNames[1]} ready to bond.`
+            ),
+            React.createElement("button",{className:"deploy-btn bonding-send-btn",disabled:bondPick.length!==2,onClick:()=>startBonding(bondPick[0],bondPick[1])},"🤝 SEND TO BONDING")
+          )
+        );
+      })();
+
   return React.createElement("div",{className:"app"},
     React.createElement("div",{className:"topbar"},
       React.createElement("div",{className:"topbar-logo"},"W.S.P.A. · JCKC GAMING"),
@@ -2553,48 +2708,8 @@ function App(){
           React.createElement("div",{className:"roster-summary-row"},`◈ ${rosterSummary.gameplayCount} heroes can be unlocked by gameplay`)
         )
       ),
-      // ── TEAM BONDING COLUMN (attached to Hero Roster, left of the map) ──
-      (()=>{
-        const bondCandidates=heroes.filter(canDeploy);
-        const mid=Math.ceil(bondCandidates.length/2);
-        const leftHeroes=bondCandidates.slice(0,mid);
-        const rightHeroes=bondCandidates.slice(mid);
-        const seen=new Set();const pairs=[];
-        heroes.forEach(h=>{
-          if(h.status==="bonding"&&!seen.has(h.id)&&h.bondPartner!=null){
-            const partner=heroes.find(x=>x.id===h.bondPartner);
-            if(partner){seen.add(h.id);seen.add(partner.id);pairs.push([h,partner]);}
-          }
-        });
-        const heroRow=(h)=>React.createElement("button",{key:h.id,
-          className:"bonding-row"+(bondPick.includes(h.id)?" sel":""),
-          onClick:()=>setBondPick(prev=>prev.includes(h.id)?prev.filter(x=>x!==h.id):prev.length<2?[...prev,h.id]:prev)
-        },h.title);
-        const pickedNames=bondPick.map(id=>heroes.find(h=>h.id===id)?.title).filter(Boolean);
-        return React.createElement("div",{className:"team-bonding-col"+tSec("bonding")},
-          React.createElement("div",{className:"panel-header"},"◈ TEAM BONDING"),
-          // Two independently-scrolling hero lists, side by side
-          React.createElement("div",{className:"bonding-lists-row"},
-            React.createElement("div",{className:"bonding-side-col"},leftHeroes.map(heroRow)),
-            React.createElement("div",{className:"bonding-side-col"},rightHeroes.map(heroRow))
-          ),
-          // Fixed footer — status + Send button never scroll with the lists above
-          React.createElement("div",{className:"bonding-footer"},
-            pairs.length>0&&React.createElement("div",{className:"bonding-pairs-list"},
-              pairs.map(([a,b])=>{
-                const remaining=Math.max(0,BOND_DURATION-(tick.current-(a.bondStartTick||0)));
-                return React.createElement("div",{key:a.id+"-"+b.id,className:"bonding-pair-card"},`${a.title} & ${b.title} — ${remaining}s`);
-              })
-            ),
-            React.createElement("div",{className:"bonding-status-msg"},
-              pickedNames.length===0?"Select 2 heroes to send.":
-              pickedNames.length===1?`${pickedNames[0]} selected — pick 1 more.`:
-              `${pickedNames[0]} & ${pickedNames[1]} ready to bond.`
-            ),
-            React.createElement("button",{className:"deploy-btn bonding-send-btn",disabled:bondPick.length!==2,onClick:()=>startBonding(bondPick[0],bondPick[1])},"🤝 SEND TO BONDING")
-          )
-        );
-      })(),
+      // CENTER COLUMN: map on top, tabbed dock (PR / Medical / Top Runs / Bonding) below
+      React.createElement("div",{className:"center-col"},
       // MAP COLUMN
       React.createElement("div",{className:"map-column"},
         React.createElement("div",{className:"map-wrap"+tSec("map")},
@@ -2606,20 +2721,38 @@ function App(){
           })
         )
       ),
-      // ── HIGH SCORES COLUMN (attached to Active Threats, right of the map) ──
-      React.createElement("div",{className:"highscore-col"+tSec("leaderboard")},
-        React.createElement("div",{className:"panel-header"},"◈ TOP RUNS"),
-        React.createElement("div",{className:"highscore-list"},
-          highScores.length===0?
-            React.createElement("div",{className:"highscore-empty"},"No runs recorded yet.\nBe the first Director on the board."):
-            highScores.map((rec,i)=>React.createElement("div",{key:i,className:"highscore-row"+(i<3?` rank-${i+1}`:"")},
-              React.createElement("span",{className:"highscore-rank"},String(i+1).padStart(2,"0")),
-              React.createElement("span",{className:"highscore-name"},rec.name),
-              React.createElement("span",{className:"highscore-pts"},rec.points)
-            ))
-        )
+      (tutorialActive&&tutorialStep&&getTutorialDialogue())&&React.createElement("div",{className:"pr-section tutorial-banner"+tSec("pr")},
+        (()=>{
+          const dlg=getTutorialDialogue();
+          const speaker=TUTORIAL_CHARACTERS[dlg.speaker];
+          return React.createElement(React.Fragment,null,
+            React.createElement("div",{className:"pr-portrait"},
+              speaker.portrait?React.createElement("img",{src:speaker.portrait,alt:speaker.name,
+                onError:e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}):null,
+              React.createElement("div",{className:"tutorial-portrait-fallback",style:{display:speaker.portrait?"none":"flex"}},
+                speaker.name.split(" ").map(w=>w[0]).join(""))
+            ),
+            React.createElement("div",{className:"pr-content"},
+              React.createElement("div",{className:"pr-speaker-name"},speaker.name.toUpperCase()),
+              React.createElement("div",{className:"pr-commentary"},dlg.text),
+              React.createElement("div",{className:"pr-controls"},
+                dlg.showBtn?React.createElement("button",{className:"pr-option-btn",onClick:tutorialContinue},dlg.finalBtn?"◈ FINISH TUTORIAL":"CONTINUE ▶"):
+                  React.createElement("div",{className:"pr-timer-note"},"◈ Waiting on you, Director...")
+              )
+            )
+          );
+        })()
       ),
-      // THREATS + HOSPITAL PANEL
+      React.createElement("div",{className:"dock"},
+        React.createElement("div",{className:"dock-tabs"},
+          DOCK_TABS.map(tb=>React.createElement("button",{key:tb.key,
+            className:"dock-tab"+(dockTab===tb.key?" active":"")+(tabGlow[tb.key]&&dockTab!==tb.key?" glow":""),
+            onClick:()=>setDockTab(tb.key)},tb.label))
+        ),
+        React.createElement("div",{className:"dock-body"},dockContent)
+      )
+      ),
+      // THREATS PANEL
       React.createElement("div",{className:"threats-panel",style:{width:threatPanelOpen?252:36,minWidth:threatPanelOpen?252:36,transition:"width 0.2s",overflow:"hidden",flexShrink:0}},
         React.createElement("div",{style:{padding:"7px 7px 0",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}},
           React.createElement("button",{className:"panel-toggle-btn",onClick:()=>setThreatPanelOpen(o=>!o),title:threatPanelOpen?"Collapse Threats Panel":"Expand Threats Panel"},threatPanelOpen?"◄":"►"),
@@ -2644,108 +2777,8 @@ function App(){
               )
             );
           })
-        ),
-        // ── MEDICAL UNIT / HOSPITAL ──
-        threatPanelOpen&&React.createElement("div",{className:"hospital-panel"+tSec("hospital")},
-          React.createElement("div",{className:"panel-header",style:{margin:"8px 0 6px",borderTop:"1px solid var(--border)",paddingTop:6}},"🏥 MEDICAL UNIT"),
-          React.createElement("div",{style:{fontSize:9,color:"var(--text3)",marginBottom:5}},`${hospitalIds.length}/5 beds · 7× regen · heroes unavailable`),
-          React.createElement("button",{className:"hospital-auto-btn",onClick:autoFillHospital,disabled:hospitalIds.length>=5},"⚕ AUTO-FILL WOUNDED"),
-          hospitalIds.length===0&&React.createElement("div",{style:{fontSize:9,color:"var(--text3)",fontStyle:"italic",marginTop:4}},"Medical bay empty."),
-          hospitalIds.map(id=>{
-            const h=heroes.find(x=>x.id===id);
-            if(!h)return null;
-            const{maxHP}=effStats(h,rom,dis);
-            const pct=Math.round((h.currentHP/maxHP)*100);
-            return React.createElement("div",{key:id,className:"hospital-card"},
-              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-                React.createElement("span",{style:{fontFamily:"var(--font-head)",fontSize:9,color:"var(--text)"}},[h.title]),
-                React.createElement("button",{className:"hospital-remove-btn",onClick:()=>removeFromHospital(id),title:"Remove from hospital"},"✕")
-              ),
-              React.createElement("div",{style:{fontSize:8,color:"var(--text3)",marginBottom:2}},`HP: ${Math.round(h.currentHP)}/${maxHP} (${pct}%)`),
-              React.createElement("div",{className:"bt",style:{marginTop:2}},React.createElement("div",{className:"bf",style:{width:`${pct}%`,background:sc(h.currentHP,maxHP)}}))
-            );
-          }),
-          heroes.filter(h=>
-            !hospitalIds.includes(h.id)&&
-            !["deployed","gameLocked","shopLocked","kia","rogue","offworld"].includes(h.status)&&
-            (()=>{const{maxHP}=effStats(h,rom,dis);return h.currentHP<maxHP;})()
-          ).length>0&&hospitalIds.length<5&&React.createElement("div",{style:{marginTop:6}},
-            React.createElement("div",{style:{fontSize:8,color:"var(--text3)",marginBottom:3}},"ADD TO MEDICAL BAY:"),
-            heroes.filter(h=>
-              !hospitalIds.includes(h.id)&&
-              !["deployed","gameLocked","shopLocked","kia","rogue","offworld"].includes(h.status)&&
-              (()=>{const{maxHP}=effStats(h,rom,dis);return h.currentHP<maxHP;})()
-            ).slice(0,6).map(h=>{
-              const{maxHP}=effStats(h,rom,dis);
-              return React.createElement("div",{key:h.id,className:"hospital-add-row",onClick:()=>addToHospital(h.id)},
-                React.createElement("span",{style:{fontSize:9,color:"var(--text2)"}},[h.title]),
-                React.createElement("span",{style:{fontSize:8,color:"var(--text3)"}},`${Math.round(h.currentHP)}/${maxHP}`)
-              );
-            })
-          )
         )
       ),
-      // ── PUBLIC RELATIONS: full-width row along the bottom of the app ──
-      React.createElement("div",{className:"pr-section"+tSec("pr")},
-        (tutorialActive&&tutorialStep&&getTutorialDialogue())?(()=>{
-          const dlg=getTutorialDialogue();
-          const speaker=TUTORIAL_CHARACTERS[dlg.speaker];
-          return React.createElement(React.Fragment,null,
-            React.createElement("div",{className:"pr-portrait"},
-              speaker.portrait?React.createElement("img",{src:speaker.portrait,alt:speaker.name,
-                onError:e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}):null,
-              React.createElement("div",{className:"tutorial-portrait-fallback",style:{display:speaker.portrait?"none":"flex"}},
-                speaker.name.split(" ").map(w=>w[0]).join(""))
-            ),
-            React.createElement("div",{className:"pr-content"},
-              React.createElement("div",{className:"pr-speaker-name"},speaker.name.toUpperCase()),
-              React.createElement("div",{className:"pr-commentary"},dlg.text),
-              React.createElement("div",{className:"pr-controls"},
-                dlg.showBtn?React.createElement("button",{className:"pr-option-btn",onClick:tutorialContinue},dlg.finalBtn?"◈ FINISH TUTORIAL":"CONTINUE ▶"):
-                  React.createElement("div",{className:"pr-timer-note"},"◈ Waiting on you, Director...")
-              )
-            )
-          );
-        })():
-        prEvent?(()=>{
-          const spk=prEvent.speaker==="nichols"?TUTORIAL_CHARACTERS.nichols:
-                     prEvent.speaker==="cassonik"?TUTORIAL_CHARACTERS.cassonik:
-                     prEvent.speaker==="franco"?{name:"Franco",portrait:"portraits/Franco.jpg"}:
-                     {name:"Augusta Spin",portrait:"portraits/Augusta.jpg"};
-          return React.createElement(React.Fragment,null,
-            React.createElement("div",{className:"pr-portrait"},
-              React.createElement("img",{src:spk.portrait,alt:spk.name,onError:e=>{e.target.style.display="none";}})
-            ),
-            React.createElement("div",{className:"pr-content"},
-              React.createElement("div",{className:"pr-speaker-name"},spk.name),
-              React.createElement("div",{className:"pr-commentary"},prEvent.text),
-              React.createElement("div",{className:"pr-controls"},
-                prEvent.type==="franco"&&prEvent.francoType==="top5"?
-                  React.createElement(React.Fragment,null,
-                    React.createElement("div",{className:"pr-timer-note"},
-                      francoRankPicks.length?`Picked: ${francoRankPicks.map((p,i)=>`${i+1}. ${p}`).join(" · ")}`:"Pick your top 5, in order."),
-                    prEvent.options.filter(o=>!francoRankPicks.includes(o)).map((opt,i)=>
-                      React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleFrancoTop5Pick(opt)},opt)),
-                    francoRankPicks.length>=5?React.createElement("button",{className:"pr-option-btn purple",onClick:handleFrancoTop5Submit},"SUBMIT ▶"):null
-                  )
-                :prEvent.type==="franco"?
-                  prEvent.options.map((opt,i)=>React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleFrancoChoice(opt)},opt))
-                :prEvent.type==="augusta_mc"?
-                  prEvent.options.map((opt,i)=>React.createElement("button",{key:i,className:"pr-option-btn",onClick:()=>handleAugustaMCChoice(opt)},opt))
-                :prEvent.type==="augusta"?
-                  React.createElement(React.Fragment,null,
-                    React.createElement("input",{className:"pr-text-input",maxLength:100,placeholder:"Type your response... (100 chars)",value:augustaInput,
-                      onChange:e=>setAugustaInput(e.target.value),
-                      onKeyDown:e=>{if(e.key==="Enter")handleAugustaSubmit();}}),
-                    React.createElement("button",{className:"pr-option-btn",disabled:!augustaInput.trim(),onClick:handleAugustaSubmit},"SUBMIT ▶"),
-                    React.createElement("div",{className:"pr-timer-note"},`${Math.max(0,prEvent.deadlineTick-tick.current)}s to respond · +20 pts`)
-                  )
-                :React.createElement("button",{className:"pr-option-btn",onClick:()=>setPrEvent(null)},"COPY THAT")
-              )
-            )
-          );
-        })():React.createElement("div",{className:"pr-idle"},"◈ PUBLIC RELATIONS — awaiting updates from the field.")
-      )
     ),
     React.createElement("div",{className:"mission-log"},
       React.createElement("div",{className:"log-prefix"},"INTEL //"),
