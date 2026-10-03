@@ -7,7 +7,7 @@
   --red:#ff3333;--yellow:#ffaa00;--green:#33ff88;--blue:#00aaff;--purple:#aa44ff;--gold:#ffd700;--pink:#ff88cc;
   --font-head:'Orbitron',monospace;--font-mono:'Share Tech Mono',monospace;
 }
-body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:14px;overflow:hidden;height:100vh}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:14px;overflow:hidden;height:100vh;height:100dvh;overscroll-behavior:none;-webkit-text-size-adjust:100%;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 .scanline{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,0.012) 2px,rgba(0,212,255,0.012) 4px);pointer-events:none;z-index:9999}
 
 /* ── MENU ── */
@@ -53,7 +53,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .codex-section{font-family:var(--font-head);font-size:14px;color:var(--accent);letter-spacing:2px;margin:12px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px}
 
 /* ── APP ── */
-.app{display:grid;grid-template-rows:48px 28px 1fr 38px;height:100vh}
+.app{display:grid;grid-template-rows:48px 28px minmax(0,1fr) 38px;height:100vh;height:100dvh;padding-bottom:env(safe-area-inset-bottom)}
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;padding:0 10px;gap:10px;flex-wrap:wrap}
 .topbar-logo{font-family:var(--font-head);font-size:14px;font-weight:900;color:var(--accent);letter-spacing:2px;text-shadow:0 0 10px var(--accent);white-space:nowrap}
 .topbar-divider{width:1px;height:22px;background:var(--border2);flex-shrink:0}
@@ -69,10 +69,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .news-ticker-track{flex:1;overflow:hidden;height:100%;display:flex;align-items:center;position:relative}
 .news-ticker-text{font-size:15px;color:var(--gold);white-space:nowrap;animation:tickerScroll 32s linear forwards;font-family:var(--font-mono);position:absolute;}
 @keyframes tickerScroll{0%{transform:translateX(110vw)}100%{transform:translateX(-110vw)}}
-.main{display:grid;grid-template-columns:auto minmax(200px,240px) 1fr minmax(200px,240px) auto;grid-template-rows:1fr 220px;grid-template-areas:"heroes bonding map scores threats" "heroes pr pr pr threats";overflow:hidden}
+.main{display:flex;flex-direction:row;flex-wrap:nowrap;min-height:0;overflow:hidden}
 
 /* ── HERO PANEL ── */
-.heroes-panel{grid-area:heroes;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;overflow-x:visible;padding:44px 8px 8px}
+.heroes-panel{flex-shrink:0;min-height:0;-webkit-overflow-scrolling:touch;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;overflow-x:visible;padding:44px 8px 8px}
 .panel-header{font-family:var(--font-head);font-size:15px;letter-spacing:2px;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:7px}
 .hero-card{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:7px 9px;margin-bottom:5px;cursor:pointer;transition:all .15s;position:relative;overflow:visible}
 .hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:.2s}
@@ -87,7 +87,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .hero-pic-placeholder{width:38px;height:38px;flex-shrink:0;background:var(--bg2);border:1px solid var(--border2);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-left:6px}
 .hero-pic-placeholder img{width:100%;height:100%;object-fit:cover;border-radius:2px}
 .hero-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
-.hero-name-text{font-family:var(--font-head);font-size:15px;font-weight:700;color:var(--text)}
+.hero-name-text{font-family:var(--font-head);font-size:11px;line-height:1.15;font-weight:700;color:var(--text)}
 .hero-name-text.john-name{color:var(--gold)}.hero-name-text.villain-name{color:#cc88ff}
 .hero-badge{font-size:8px;padding:1px 4px;border-radius:2px;font-family:var(--font-mono);flex-shrink:0}
 .badge-ready{background:rgba(51,255,136,.12);color:var(--green);border:1px solid rgba(51,255,136,.3)}
@@ -100,7 +100,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .badge-shop{background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.3)}
 .badge-locked{background:rgba(100,100,100,.12);color:#666;border:1px solid rgba(100,100,100,.3)}
 .badge-offworld{background:rgba(170,68,255,.12);color:var(--purple);border:1px solid rgba(170,68,255,.3)}
-.hero-meta{font-size:14px;color:var(--text3);margin-bottom:4px}
+.hero-meta{font-size:10px;color:var(--text3);margin-bottom:4px}
 .stat-row{display:flex;align-items:center;gap:4px;margin-top:2px}
 .sl{font-size:8px;color:var(--text3);width:16px;flex-shrink:0}
 .bt{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
@@ -125,13 +125,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 @keyframes pulseRing{0%,100%{opacity:.9}50%{opacity:.15}}
 
 /* ── THREAT PANEL ── */
-.threats-panel{grid-area:threats;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column}
+.threats-panel{flex-shrink:0;min-height:0;-webkit-overflow-scrolling:touch;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column}
 .threat-list{flex:1;overflow-y:auto;padding:8px}
 .threat-card{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:7px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
 .threat-card:hover{border-color:var(--border2)}.threat-card.sel{border-color:var(--accent)}
 .threat-card.priority-purple{border-left:3px solid var(--purple)}.threat-card.priority-red{border-left:3px solid var(--red)}
 .threat-card.priority-orange{border-left:3px solid #ff7722}.threat-card.priority-yellow{border-left:3px solid var(--yellow)}
-.threat-name{font-family:var(--font-head);font-size:15px;color:var(--text);margin-bottom:1px}
+.threat-name{font-family:var(--font-head);font-size:10px;line-height:1.2;color:var(--text);margin-bottom:1px}
 .threat-loc{font-size:10px;color:var(--text3);margin-bottom:3px}
 .threat-meta-row{display:flex;gap:5px;font-size:9px;flex-wrap:wrap;align-items:center}
 .t-timer{color:var(--accent2)}
@@ -185,11 +185,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .map-zoom-btn:hover{background:rgba(0,212,255,.15)}
 
 /* ── HOSPITAL / MEDICAL UNIT ── */
-.hospital-panel{padding:0 8px 12px;border-top:1px solid var(--border);flex-shrink:0}
+.hospital-panel{padding:0 0 8px;flex-shrink:0}
 .hospital-auto-btn{width:100%;padding:5px;background:transparent;border:1px solid #33ff88;color:#33ff88;font-family:var(--font-head);font-size:8px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:.15s;margin-bottom:6px}
 .hospital-auto-btn:hover{background:rgba(51,255,136,.1)}.hospital-auto-btn:disabled{opacity:.35;cursor:default}
 .hospital-card{background:var(--bg3);border:1px solid rgba(51,255,136,.25);border-radius:3px;padding:6px 8px;margin-bottom:4px}
-.hospital-remove-btn{background:transparent;border:none;color:var(--red);cursor:pointer;font-size:10px;padding:0 2px;opacity:.7;transition:.15s}
+.hospital-remove-btn{background:transparent;border:none;color:var(--red);cursor:pointer;font-size:12px;min-width:30px;min-height:30px;padding:0 2px;opacity:.7;transition:.15s}
 .hospital-remove-btn:hover{opacity:1}
 .hospital-add-row{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;margin-bottom:3px;cursor:pointer;transition:.15s}
 .hospital-add-row:hover{border-color:#33ff88;background:rgba(51,255,136,.05)}
@@ -202,15 +202,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 
 /* ── TUTORIAL ── */
 .tutorial-menu-btn{border-color:var(--accent);color:var(--accent)}
-.map-column{grid-area:map;display:flex;flex-direction:column;min-width:0;overflow:hidden;height:100%}
+.map-column{display:flex;flex-direction:column;min-width:0;overflow:hidden;flex:1 1 56%;min-height:0}
 .map-wrap{position:relative;overflow:hidden;min-width:0;width:100%;flex:1;min-height:0}
 .map-wrap .map-area{width:100%;height:100%}
 
 /* ── TEAM BONDING: now a standing column between Hero Roster and the Map ── */
-.team-bonding-col{grid-area:bonding;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;padding:8px;min-height:0}
-.bonding-lists-row{display:flex;gap:6px;flex:1;min-height:0;margin:4px 0 8px}
-.bonding-side-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;overflow-y:auto;min-height:0}
-.bonding-row{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2);font-size:9px;padding:4px 7px;border-radius:3px;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.dock-bonding{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+.bonding-lists-row{display:flex;gap:6px;flex:1;min-height:0;margin:0 0 8px}
+.bonding-side-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
+.bonding-row{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2);font-size:10px;min-height:32px;padding:4px 7px;border-radius:3px;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
 .bonding-row.sel{background:rgba(0,212,255,.18);border-color:var(--accent);color:var(--accent)}
 /* Footer never scrolls with the lists above it — status + send button stay put */
 .bonding-footer{flex-shrink:0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px}
@@ -220,7 +220,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .bonding-send-btn{flex:none}
 
 /* ── HIGH SCORES: arcade-style top-10 board, mirrors Team Bonding on the other side of the map ── */
-.highscore-col{grid-area:scores;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;padding:8px}
+.dock-runs{display:flex;flex-direction:column;min-height:0}
 .highscore-list{flex:1;overflow-y:auto;font-family:var(--font-head);display:flex;flex-direction:column;gap:2px;margin-top:4px}
 .highscore-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:2px;font-size:11px;letter-spacing:.5px}
 .highscore-row:nth-child(odd){background:rgba(255,255,255,.03)}
@@ -233,15 +233,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 .highscore-empty{margin:auto;font-size:10px;color:var(--text3);font-style:italic;text-align:center}
 
 /* ── PUBLIC RELATIONS: now its own full-width row along the bottom of the app ── */
-.pr-section{grid-area:pr;display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border);background:var(--panel);overflow:hidden}
+.pr-section{display:flex;gap:10px;padding:8px 12px;border-top:1px solid var(--border);background:var(--panel);overflow:hidden}
 .pr-idle{margin:auto;font-size:10px;color:var(--text3);font-style:italic;text-align:center}
 .pr-portrait{width:auto;min-width:0;flex-shrink:0;height:100%;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#0a0a0a;display:flex;align-items:center;justify-content:center}
 .pr-portrait img{width:auto;height:100%;max-width:220px;object-fit:contain;display:block}
 .pr-content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.pr-speaker-name{font-family:var(--font-head);font-size:15px;color:var(--gold);letter-spacing:1px;margin-bottom:4px}
-.pr-commentary{font-size:15px;color:var(--text);line-height:1.5;overflow-y:auto;flex:1;padding-right:4px}
+.pr-speaker-name{font-family:var(--font-head);font-size:13px;color:var(--gold);letter-spacing:1px;margin-bottom:4px}
+.pr-commentary{font-size:13px;color:var(--text);line-height:1.5;overflow-y:auto;flex:1;padding-right:4px}
 .pr-controls{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
-.pr-option-btn{background:rgba(0,212,255,.08);border:1px solid var(--accent);color:var(--accent);font-family:var(--font-head);font-size:9px;letter-spacing:.5px;padding:6px 10px;border-radius:3px;cursor:pointer;transition:background .15s}
+.pr-option-btn{min-height:34px;touch-action:manipulation;background:rgba(0,212,255,.08);border:1px solid var(--accent);color:var(--accent);font-family:var(--font-head);font-size:9px;letter-spacing:.5px;padding:6px 10px;border-radius:3px;cursor:pointer;transition:background .15s}
 .pr-option-btn:hover{background:rgba(0,212,255,.18)}
 .pr-option-btn:disabled{opacity:.4;cursor:not-allowed}
 .pr-text-input{flex:1;min-width:160px;background:#0a0a0a;border:1px solid var(--border);color:var(--text);font-size:10px;padding:6px 8px;border-radius:3px}
@@ -354,3 +354,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);font-si
 /* Background music mute toggle — plain DOM element, fixed above every screen */
 #music-toggle-btn{position:fixed;top:8px;right:8px;z-index:99999;width:34px;height:34px;border-radius:50%;background:rgba(10,10,10,.85);border:1px solid var(--border,#333);color:#eee;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 #music-toggle-btn:hover{border-color:var(--accent,#00d4ff)}
+
+/* ═══ CENTER COLUMN + TABBED DOCK (PR / Medical / Top Runs / Bonding) ═══ */
+.center-col{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.center-col .map-area{touch-action:none}
+.dock{flex:0 0 40%;min-height:150px;display:flex;flex-direction:column;border-top:1px solid var(--border2);background:var(--bg2)}
+.dock-tabs{display:flex;gap:4px;padding:4px;border-bottom:1px solid var(--border);flex:0 0 auto}
+.dock-tab{flex:1 1 0;min-height:40px;padding:4px 6px;font-family:var(--font-head);font-size:10px;letter-spacing:1px;color:var(--text2);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:.15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.dock-tab:hover{border-color:var(--border2)}
+.dock-tab.active{color:var(--accent);border-color:var(--accent);background:rgba(0,212,255,.10)}
+/* "something is waiting here" — PR prompts and tutorial pointers */
+.dock-tab.glow{color:var(--gold);border-color:var(--gold);animation:dockGlow 1.1s ease-in-out infinite}
+@keyframes dockGlow{0%,100%{box-shadow:0 0 0 rgba(255,215,0,0);background:rgba(255,215,0,.06)}50%{box-shadow:0 0 12px rgba(255,215,0,.85);background:rgba(255,215,0,.22)}}
+.dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 8px}
+.dock-pr{border-top:none;background:transparent;padding:0;min-height:100%}
+.dock-pr .pr-portrait{height:96px;max-width:110px}
+.dock-pr .pr-portrait img{max-width:110px}
+.dock-medical{display:block}
+.tutorial-banner{flex:0 0 auto;max-height:34%;overflow-y:auto;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent)}
+.tutorial-banner .pr-portrait{height:86px;max-width:100px}
+
+/* ═══ iOS / TOUCH ═══ */
+button,.hero-card,.threat-card,.hsi,.bonding-row{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.menu-input,.pr-text-input{font-size:16px} /* stops iOS Safari zooming the page when an input is focused */
+.mbtn{min-height:40px}
+.map-zoom-btn{width:34px;height:34px;font-size:15px}
+.panel-toggle-btn{min-width:30px;min-height:28px}
+@media (max-width:900px){
+  .dock{flex-basis:46%}
+  .dock-tab{font-size:9px;letter-spacing:.5px}
+}
