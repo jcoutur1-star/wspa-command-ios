@@ -165,6 +165,30 @@ function setBgTrack(screen){
   else mount();
 })();
 
+// Side panels trimmed by the same amount (45px each, down from 290 / 252) to give the map + PR dock more room.
+const SIDE_PANEL_W_HERO=245;
+const SIDE_PANEL_W_THREAT=207;
+
+// Shrinks the PR dock + tutorial dialogue text by 2px relative to whatever the stylesheet currently sets.
+// Measures real computed sizes (via a throwaway probe mirroring the dock structure) so no CSS file edit is needed.
+function applyPrFontTrim(){
+  if(document.getElementById("pr-font-trim"))return;
+  const probe=document.createElement("div");
+  probe.style.cssText="position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0";
+  probe.innerHTML='<div class="app"><div class="main"><div class="center-col"><div class="dock"><div class="dock-body"><div class="pr-section dock-pr"><div class="pr-content"><div class="pr-speaker-name">x</div><div class="pr-commentary">x</div><div class="pr-controls"><button class="pr-option-btn">x</button><div class="pr-timer-note">x</div><input class="pr-text-input"></div></div><div class="pr-idle">x</div></div></div></div></div></div></div>';
+  document.body.appendChild(probe);
+  const sels=[".pr-speaker-name",".pr-commentary",".pr-option-btn",".pr-timer-note",".pr-text-input",".pr-idle"];
+  let css="";
+  sels.forEach(sel=>{
+    const el=probe.querySelector(sel);if(!el)return;
+    const px=parseFloat(getComputedStyle(el).fontSize);
+    if(px>0)css+=`.dock-pr ${sel}{font-size:${Math.max(7,px-2)}px !important;}\n`;
+  });
+  document.body.removeChild(probe);
+  if(!css)return;
+  const st=document.createElement("style");st.id="pr-font-trim";st.textContent=css;document.head.appendChild(st);
+}
+
 function App(){
   const [bank,setBank]=useState(loadBank);
   const [highScores,setHighScores]=useState(loadHighScores);
@@ -193,6 +217,7 @@ function App(){
   // Swap the looping track whenever the screen category changes (module-level
   // bgMusic singleton — see trackForScreen/setBgTrack near the top of the file).
   useEffect(()=>{setBgTrack(screen);},[screen]);
+  useEffect(()=>{if(screen==="game")applyPrFontTrim();},[screen]);
   const [nameInput,setNameInput]=useState("");
   const [directorName,setDirectorName]=useState("");
   const [ageMode,setAgeMode]=useState(loadAgeMode); // "modern" | "golden" | "silver" — home-screen era dial
@@ -217,9 +242,8 @@ function App(){
   const [dockTab,setDockTab]=useState("pr"); // PR is always the first tab shown
   useEffect(()=>{
     if(!tutorialActive)return;
-    if(tutorialStep==="hospital")setDockTab("medical");
-    else if(tutorialStep==="bonding_mention")setDockTab("bonding");
-    else setDockTab("pr");
+    // All tutorial dialogue lives in the PR tab; the Medical / Bonding tabs just glow when they're the next target.
+    setDockTab("pr");
   },[tutorialActive,tutorialStep]);
 
   const [heroes,setHeroes]=useState([]);
@@ -969,6 +993,7 @@ function App(){
           const ckQuote=Math.random()<0.5?CK_JOHN_DEPARTURE_RESPONSES[Math.floor(Math.random()*CK_JOHN_DEPARTURE_RESPONSES.length)]:null;
           const headline=pickHeadline("johnLeavesToOtherPlanets",[{title:"John"}],null,null);
           if(headline)pushHeadline(headline);
+          queueUrgentPr({kind:"speech",speaker:"john",text:quote});
           setLog(`🚀 John: "${quote}"${ckQuote?` · The Crimson Knight: "${ckQuote}"`:""  }`);
           return prev.map(h=>h.isJohn?{...h,status:"offworld",speechBubble:quote,pendingOffworld:false}:
             (h.title==="The Crimson Knight"&&ckQuote)?{...h,speechBubble:ckQuote}:h);
@@ -987,6 +1012,7 @@ function App(){
           const rogueActive=prev.some(h=>h.status==="rogue"&&(h.title==="The Crimson Knight"||h.pendingJohnRogue));
           const councilActive=tRef.current.some(t=>t.isRogueCouncil);
           if(rogueActive||councilActive){
+            queueUrgentPr({kind:"speech",speaker:"john",text:"I want this to end peacefully. No one gets hurt."});
             setLog(`🔴 John has returned — and joins the rogue heroes. "I want this to end peacefully. No one gets hurt."`);
             // Update existing rogue council threat to mark John present
             setThreats(p=>p.map(t=>t.isRogueCouncil||t.isCKJohnTeamUp?{...t,johnPresent:true,desc:t.desc+" John has returned and joined them. This is now a 99% loss for the Director."}:t));
@@ -994,6 +1020,7 @@ function App(){
               // Ironside not rogue: give him his quote
               (h.title==="Ironside"&&h.status!=="rogue")?{...h,speechBubble:"We're better off without them."}:h);
           }
+          queueUrgentPr({kind:"speech",speaker:"john",text:"I'm back!"});
           setLog(`🌟 John has returned! (90% HP)`);
           return prev.map(h=>h.isJohn?{...h,status:returnHP<(h.functionalAt||0)?"exhausted":"ready",currentHP:returnHP,speechBubble:"I'm back!"}:h);
         }
@@ -1126,6 +1153,8 @@ function App(){
             setPrEvent({type:"johnsave",speaker:item.speaker,text:item.text,firedAt:t});
           } else if(item.kind==="suicide"){
             setPrEvent({type:"suicide",speaker:"cassonik",text:item.text,firedAt:t});
+          } else if(item.kind==="speech"){
+            setPrEvent({type:"speech",speaker:item.speaker,text:item.text,firedAt:t});
           } else if(item.kind==="george_prospect"){
             setPrEvent({type:"george_prospect",speaker:"nichols",
               text:"When you have time, check out our new prospect back at HQ!",firedAt:t});
@@ -1153,7 +1182,7 @@ function App(){
       } else if(prEventRef.current.type==="augusta"&&t>=prEventRef.current.deadlineTick){
         pushHeadline(AUGUSTA_NO_COMMENT_HEADLINE);
         setPrEvent(null);setAugustaInput("");
-      } else if(["tip","nichols30","johnsave","suicide"].includes(prEventRef.current.type)&&t-(prEventRef.current.firedAt||t)>=8){
+      } else if(["tip","nichols30","johnsave","suicide","speech"].includes(prEventRef.current.type)&&t-(prEventRef.current.firedAt||t)>=8){
         setPrEvent(null);
       } else if(prEventRef.current.type==="george_prospect"&&t-(prEventRef.current.firedAt||t)>=20){
         setPrEvent(null);
@@ -1362,7 +1391,7 @@ function App(){
         const{maxHP}=effStats(h,romRef.current,disRef.current);
         // Apply Blink flashing lights — halve damage to all teammates except Blink herself
         if(blinkActivates&&h.title!=="Blink")d={health:Math.floor(d.health/2)};
-        if(h.isJohn&&h.currentHP-d.health<=0){/* John cannot die: swap look, restore full HP, new quote */const alt=!h.johnAltLook;const q=alt?JOHN_NEW_LOOK_QUOTE:JOHN_CLASSIC_LOOK_QUOTE;const base=ALL_HERO_DEFS.find(x=>x.isJohn);setLog(`🌟 John: "${q}"`);h={...h,currentHP:maxHP,johnAltLook:alt,portrait:alt?base.altPortrait:base.portrait,status:"ready",speechBubble:q,_icebergBonus:false,_conductorBonus:false};if(h.pendingOffworld){return{...h,status:"offworld",pendingOffworld:false};}return h;}if(h.isJohn){const johnNewHP=Math.max(h.functionalAt,h.currentHP-d.health);if(h.pendingOffworld){const quote=JOHN_DEPARTURE_QUOTES[Math.floor(Math.random()*JOHN_DEPARTURE_QUOTES.length)];const ckQuote=Math.random()<0.5?CK_JOHN_DEPARTURE_RESPONSES[Math.floor(Math.random()*CK_JOHN_DEPARTURE_RESPONSES.length)]:null;const headline=pickHeadline("johnLeavesToOtherPlanets",[{title:"John"}],null,null);if(headline)pushHeadline(headline);setLog(`🚀 John finished the mission — then departed. "${quote}"${ckQuote?` · Crimson Knight: "${ckQuote}"`:"" }`);return{...h,currentHP:johnNewHP,status:"offworld",_icebergBonus:false,_conductorBonus:false,speechBubble:quote,pendingOffworld:false};}return{...h,currentHP:johnNewHP,status:johnNewHP<=h.functionalAt?"resting":"ready",_icebergBonus:false,_conductorBonus:false,speechBubble:null};}
+        if(h.isJohn&&h.currentHP-d.health<=0){/* John cannot die: swap look, restore full HP, new quote */const alt=!h.johnAltLook;const q=alt?JOHN_NEW_LOOK_QUOTE:JOHN_CLASSIC_LOOK_QUOTE;const base=ALL_HERO_DEFS.find(x=>x.isJohn);queueUrgentPr({kind:"speech",speaker:"john",text:q});setLog(`🌟 John: "${q}"`);h={...h,currentHP:maxHP,johnAltLook:alt,portrait:alt?base.altPortrait:base.portrait,status:"ready",speechBubble:q,_icebergBonus:false,_conductorBonus:false};if(h.pendingOffworld){return{...h,status:"offworld",pendingOffworld:false};}return h;}if(h.isJohn){const johnNewHP=Math.max(h.functionalAt,h.currentHP-d.health);if(h.pendingOffworld){const quote=JOHN_DEPARTURE_QUOTES[Math.floor(Math.random()*JOHN_DEPARTURE_QUOTES.length)];const ckQuote=Math.random()<0.5?CK_JOHN_DEPARTURE_RESPONSES[Math.floor(Math.random()*CK_JOHN_DEPARTURE_RESPONSES.length)]:null;const headline=pickHeadline("johnLeavesToOtherPlanets",[{title:"John"}],null,null);if(headline)pushHeadline(headline);queueUrgentPr({kind:"speech",speaker:"john",text:quote});setLog(`🚀 John finished the mission — then departed. "${quote}"${ckQuote?` · Crimson Knight: "${ckQuote}"`:"" }`);return{...h,currentHP:johnNewHP,status:"offworld",_icebergBonus:false,_conductorBonus:false,speechBubble:quote,pendingOffworld:false};}return{...h,currentHP:johnNewHP,status:johnNewHP<=h.functionalAt?"resting":"ready",_icebergBonus:false,_conductorBonus:false,speechBubble:null};}
         let nHP=Math.max(0,h.currentHP-d.health);
         if(gummyP&&h.title!=="The Gummy Bear")nHP=Math.max(0,h.currentHP-Math.floor(d.health/2));
         const shamrock=assigned.find(x=>x.title==="Captain Shamrock");
@@ -1389,7 +1418,7 @@ function App(){
                 cassonikWarnedRef.current=true;
                 setTimeout(()=>{
                   setHeroes(p2=>p2.map(x=>x.title==="Cassonik"?{...x,speechBubble:"Heroes don't like being set up to die. They might go rogue…"}:x));
-                  setLog("⚠ Cassonik: \"Heroes don't like being set up to die. They might go rogue…\"");
+                  setLog("⚠ Cassonik: \"Heroes don't like being set up to die. They might go rogue…\"");queueUrgentPr({kind:"speech",speaker:"cassonik",text:"Heroes don't like being set up to die. They might go rogue…"});
                 },600);
               }
               const rogueThreat={
@@ -1414,7 +1443,7 @@ function App(){
                 cassonikWarnedRef.current=true;
                 setTimeout(()=>{
                   setHeroes(p2=>p2.map(x=>x.title==="Cassonik"?{...x,speechBubble:"Heroes don't like being set up to die. They might go rogue…"}:x));
-                  setLog("⚠ Cassonik: \"Heroes don't like being set up to die. They might go rogue…\"");
+                  setLog("⚠ Cassonik: \"Heroes don't like being set up to die. They might go rogue…\"");queueUrgentPr({kind:"speech",speaker:"cassonik",text:"Heroes don't like being set up to die. They might go rogue…"});
                 },600);
               }
               return{...h,currentHP:0,status:"kia",_icebergBonus:false,_conductorBonus:false,speechBubble:null};
@@ -1473,6 +1502,7 @@ function App(){
               const griefQuote=JOHN_GRIEF_QUOTES[Math.floor(Math.random()*JOHN_GRIEF_QUOTES.length)];
               setTimeout(()=>{
                 setHeroes(p2=>p2.map(j=>j.isJohn?{...j,status:"offworld",speechBubble:griefQuote,pendingOffworld:false,ckGrief:true}:j));
+                queueUrgentPr({kind:"speech",speaker:"john",text:griefQuote});
                 setLog("💔 John: \""+griefQuote+"\" — He has left Earth. He will not return.");
                 const headline=pickHeadline("johnLeavesToOtherPlanets",[{title:"John"}],null,null);
                 if(headline)pushHeadline("[Heroes Weekly] John has vanished following the loss of The Crimson Knight. Experts fear he may never return.");
@@ -2474,16 +2504,21 @@ function App(){
   const tutHl=(tutorialActive&&tutorialStep)?tutorialHighlightFor(tutorialStep):"none";
   const tutHas=n=>tutHl!=="none"&&tutHl.includes(n);
   const tabGlow={
-    pr:!!prEvent,                       // a PR prompt is waiting (not used by the tutorial, which has its own banner)
+    pr:!!prEvent||!!tutDlg,             // a PR prompt (or tutorial line) is waiting
     medical:tutHas("hospital"),
     runs:tutHas("leaderboard"),
     bonding:tutHas("bonding")
   };
+  // Tutorial dialogue (Nichols/Cassonik) now lives inside the PR tab instead of floating over the map.
+  const tutDlg=(tutorialActive&&tutorialStep)?getTutorialDialogue():null;
+  const prEventView=tutDlg?{type:"tutorial",speaker:tutDlg.speaker,text:tutDlg.text,showBtn:tutDlg.showBtn,finalBtn:tutDlg.finalBtn}:prEvent;
   const dockContent=dockTab==="pr"?
 React.createElement("div",{className:"pr-section dock-pr"},
-        prEvent?(()=>{
+        prEventView?(()=>{
+          const prEvent=prEventView;
           const spk=prEvent.speaker==="nichols"?TUTORIAL_CHARACTERS.nichols:
                      prEvent.speaker==="cassonik"?TUTORIAL_CHARACTERS.cassonik:
+                     prEvent.speaker==="john"?{name:"John",portrait:"portraits/John.jpg"}:
                      prEvent.speaker==="franco"?{name:"Franco",portrait:"portraits/Franco.jpg"}:
                      {name:"Augusta Spin",portrait:"portraits/Augusta.jpg"};
           return React.createElement(React.Fragment,null,
@@ -2494,7 +2529,10 @@ React.createElement("div",{className:"pr-section dock-pr"},
               React.createElement("div",{className:"pr-speaker-name"},spk.name),
               React.createElement("div",{className:"pr-commentary"},prEvent.text),
               React.createElement("div",{className:"pr-controls"},
-                prEvent.type==="franco"&&prEvent.francoType==="top5"?
+                prEvent.type==="tutorial"?
+                  (prEvent.showBtn?React.createElement("button",{className:"pr-option-btn",onClick:tutorialContinue},prEvent.finalBtn?"◈ FINISH TUTORIAL":"CONTINUE ▶"):
+                    React.createElement("div",{className:"pr-timer-note"},"◈ Waiting on you, Director..."))
+                :prEvent.type==="franco"&&prEvent.francoType==="top5"?
                   React.createElement(React.Fragment,null,
                     React.createElement("div",{className:"pr-timer-note"},
                       francoRankPicks.length?`Picked: ${francoRankPicks.map((p,i)=>`${i+1}. ${p}`).join(" · ")}`:"Pick your top 5, in order."),
@@ -2587,7 +2625,6 @@ React.createElement("div",{className:"pr-section dock-pr"},
           className:"bonding-row"+(bondPick.includes(h.id)?" sel":""),
           onClick:()=>setBondPick(prev=>prev.includes(h.id)?prev.filter(x=>x!==h.id):prev.length<2?[...prev,h.id]:prev)
         },h.title);
-        const pickedNames=bondPick.map(id=>heroes.find(h=>h.id===id)?.title).filter(Boolean);
         return React.createElement("div",{className:"dock-bonding"},
                     // Two independently-scrolling hero lists, side by side
           React.createElement("div",{className:"bonding-lists-row"},
@@ -2601,11 +2638,6 @@ React.createElement("div",{className:"pr-section dock-pr"},
                 const remaining=Math.max(0,BOND_DURATION-(tick.current-(a.bondStartTick||0)));
                 return React.createElement("div",{key:a.id+"-"+b.id,className:"bonding-pair-card"},`${a.title} & ${b.title} — ${remaining}s`);
               })
-            ),
-            React.createElement("div",{className:"bonding-status-msg"},
-              pickedNames.length===0?"Select 2 heroes to send.":
-              pickedNames.length===1?`${pickedNames[0]} selected — pick 1 more.`:
-              `${pickedNames[0]} & ${pickedNames[1]} ready to bond.`
             ),
             React.createElement("button",{className:"deploy-btn bonding-send-btn",disabled:bondPick.length!==2,onClick:()=>startBonding(bondPick[0],bondPick[1])},"🤝 SEND TO BONDING")
           )
@@ -2637,9 +2669,9 @@ React.createElement("div",{className:"pr-section dock-pr"},
     ),
     React.createElement("div",{className:"main"},
       // HERO PANEL
-      React.createElement("div",{className:"heroes-panel"+tSec("heroes"),style:{width:heroPanelOpen?290:36,minWidth:heroPanelOpen?290:36,transition:"width 0.2s"}},
-        React.createElement("div",{className:"panel-header",style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
-          heroPanelOpen&&React.createElement("span",null,"◈ HERO ROSTER"),
+      React.createElement("div",{className:"heroes-panel"+tSec("heroes"),style:{width:heroPanelOpen?SIDE_PANEL_W_HERO:36,minWidth:heroPanelOpen?SIDE_PANEL_W_HERO:36,paddingTop:0,transition:"width 0.2s"}},
+        React.createElement("div",{style:{padding:"7px 7px 0",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,whiteSpace:"nowrap"}},
+          heroPanelOpen&&React.createElement("div",{className:"panel-header",style:{flex:1,margin:0}},"◈ HERO ROSTER"),
           React.createElement("button",{className:"panel-toggle-btn",onClick:()=>setHeroPanelOpen(o=>!o),title:heroPanelOpen?"Collapse Hero Panel":"Expand Hero Panel"},heroPanelOpen?"◄":"►")
         ),
         heroPanelOpen&&sortedHeroes.map(h=>{
@@ -2721,29 +2753,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
           })
         )
       ),
-      (tutorialActive&&tutorialStep&&getTutorialDialogue())&&React.createElement("div",{className:"pr-section tutorial-banner"+tSec("pr")},
-        (()=>{
-          const dlg=getTutorialDialogue();
-          const speaker=TUTORIAL_CHARACTERS[dlg.speaker];
-          return React.createElement(React.Fragment,null,
-            React.createElement("div",{className:"pr-portrait"},
-              speaker.portrait?React.createElement("img",{src:speaker.portrait,alt:speaker.name,
-                onError:e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}):null,
-              React.createElement("div",{className:"tutorial-portrait-fallback",style:{display:speaker.portrait?"none":"flex"}},
-                speaker.name.split(" ").map(w=>w[0]).join(""))
-            ),
-            React.createElement("div",{className:"pr-content"},
-              React.createElement("div",{className:"pr-speaker-name"},speaker.name.toUpperCase()),
-              React.createElement("div",{className:"pr-commentary"},dlg.text),
-              React.createElement("div",{className:"pr-controls"},
-                dlg.showBtn?React.createElement("button",{className:"pr-option-btn",onClick:tutorialContinue},dlg.finalBtn?"◈ FINISH TUTORIAL":"CONTINUE ▶"):
-                  React.createElement("div",{className:"pr-timer-note"},"◈ Waiting on you, Director...")
-              )
-            )
-          );
-        })()
-      ),
-      React.createElement("div",{className:"dock"},
+      React.createElement("div",{className:"dock"+tSec("pr")},
         React.createElement("div",{className:"dock-tabs"},
           DOCK_TABS.map(tb=>React.createElement("button",{key:tb.key,
             className:"dock-tab"+(dockTab===tb.key?" active":"")+(tabGlow[tb.key]&&dockTab!==tb.key?" glow":""),
@@ -2753,7 +2763,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
       )
       ),
       // THREATS PANEL
-      React.createElement("div",{className:"threats-panel",style:{width:threatPanelOpen?252:36,minWidth:threatPanelOpen?252:36,transition:"width 0.2s",overflow:"hidden",flexShrink:0}},
+      React.createElement("div",{className:"threats-panel",style:{width:threatPanelOpen?SIDE_PANEL_W_THREAT:36,minWidth:threatPanelOpen?SIDE_PANEL_W_THREAT:36,transition:"width 0.2s",overflow:"hidden",flexShrink:0}},
         React.createElement("div",{style:{padding:"7px 7px 0",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}},
           React.createElement("button",{className:"panel-toggle-btn",onClick:()=>setThreatPanelOpen(o=>!o),title:threatPanelOpen?"Collapse Threats Panel":"Expand Threats Panel"},threatPanelOpen?"◄":"►"),
           threatPanelOpen&&React.createElement("div",{className:"panel-header",style:{flex:1,margin:0}},"◈ ACTIVE THREATS")
