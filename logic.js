@@ -126,6 +126,8 @@ function heroSpecialsAdjustment(heroes,threat,rom,dis){
   let adj=0;
   if(heroes.length===1&&heroes[0].title==="Shadowmere")adj+=4;
   if(heroes.length>=2&&heroes.some(h=>h.title==="Greywulf"))adj+=5;
+  // Seraph — Celestial Aura: +5% Mission Success whenever he is deployed (flat percentage points).
+  if(heroes.some(h=>h.title==="Seraph"))adj+=5;
   if(threat.isOcean&&heroes.some(h=>h.title==="Hydrothylre"))adj+=34;
   if(threat.isOcean&&heroes.some(h=>h.title==="Hydrotheppilies"))adj+=34;
   if(heroes.some(h=>h.title==="Captain Shamrock"))adj+=10;
