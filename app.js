@@ -2503,6 +2503,8 @@ function App(){
   const DOCK_TABS=[{key:"pr",label:"📣 PR"},{key:"medical",label:"🏥 MEDICAL"},{key:"runs",label:"🏆 TOP RUNS"},{key:"bonding",label:"🤝 BONDING"}];
   const tutHl=(tutorialActive&&tutorialStep)?tutorialHighlightFor(tutorialStep):"none";
   const tutHas=n=>tutHl!=="none"&&tutHl.includes(n);
+  // Declared before tabGlow, which reads it.
+  const tutDlg=(tutorialActive&&tutorialStep)?getTutorialDialogue():null;
   const tabGlow={
     pr:!!prEvent||!!tutDlg,             // a PR prompt (or tutorial line) is waiting
     medical:tutHas("hospital"),
@@ -2510,7 +2512,6 @@ function App(){
     bonding:tutHas("bonding")
   };
   // Tutorial dialogue (Nichols/Cassonik) now lives inside the PR tab instead of floating over the map.
-  const tutDlg=(tutorialActive&&tutorialStep)?getTutorialDialogue():null;
   const prEventView=tutDlg?{type:"tutorial",speaker:tutDlg.speaker,text:tutDlg.text,showBtn:tutDlg.showBtn,finalBtn:tutDlg.finalBtn}:prEvent;
   const dockContent=dockTab==="pr"?
 React.createElement("div",{className:"pr-section dock-pr"},
