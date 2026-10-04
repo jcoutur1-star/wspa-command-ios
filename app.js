@@ -189,6 +189,42 @@ function applyPrFontTrim(){
   const st=document.createElement("style");st.id="pr-font-trim";st.textContent=css;document.head.appendChild(st);
 }
 
+// Speech bubble that escapes the scrolling roster panel (which clips absolutely-positioned children).
+// Rendered in a portal on <body>, fixed-positioned just above its hero card, so the top hero's
+// bubble draws over both the "HERO ROSTER" header and the news ticker.
+function HeroBubble({text}){
+  const ph=useRef(null);
+  const [rect,setRect]=useState(null);
+  const update=()=>{
+    const card=ph.current&&ph.current.parentElement;if(!card)return;
+    const r=card.getBoundingClientRect();
+    setRect(prev=>(prev&&prev.left===r.left&&prev.top===r.top&&prev.width===r.width)?prev:{left:r.left,top:r.top,width:r.width});
+  };
+  React.useLayoutEffect(update);
+  useEffect(()=>{
+    window.addEventListener("scroll",update,true);window.addEventListener("resize",update);
+    return()=>{window.removeEventListener("scroll",update,true);window.removeEventListener("resize",update);};
+  },[]);
+  return React.createElement(React.Fragment,null,
+    React.createElement("span",{ref:ph,style:{display:"none"}}),
+    rect&&ReactDOM.createPortal(
+      React.createElement("div",{className:"speech-bubble",style:{position:"fixed",left:rect.left+8,right:"auto",top:"auto",bottom:window.innerHeight-rect.top+6,width:Math.max(120,rect.width-16),transform:"none",zIndex:10000,pointerEvents:"none"}},text),
+      document.body)
+  );
+}
+
+// Panel title that shrinks its own font only as much as needed to fit the space it's given.
+function FitHeader({children}){
+  const ref=useRef(null);
+  React.useLayoutEffect(()=>{
+    const el=ref.current;if(!el)return;
+    el.style.fontSize="";
+    let px=parseFloat(getComputedStyle(el).fontSize)||14,guard=0;
+    while(el.scrollWidth>el.clientWidth+0.5&&px>8&&guard<40){px-=0.5;el.style.fontSize=px+"px";guard++;}
+  },[children]);
+  return React.createElement("div",{ref,className:"panel-header",style:{flex:1,margin:0,minWidth:0,overflow:"hidden",whiteSpace:"nowrap"}},children);
+}
+
 function App(){
   const [bank,setBank]=useState(loadBank);
   const [highScores,setHighScores]=useState(loadHighScores);
@@ -1396,6 +1432,12 @@ function App(){
         if(gummyP&&h.title!=="The Gummy Bear")nHP=Math.max(0,h.currentHP-Math.floor(d.health/2));
         const shamrock=assigned.find(x=>x.title==="Captain Shamrock");
         if(nHP===0&&shamrock&&h.id!==shamrock.id)nHP=1;
+        // The Anchor — "Cannot be one-shot": if he entered the mission at full health, no amount of damage kills him (left at 1 HP).
+        // "Full" ignores per-mission bonuses (IceBerg / Conductor) so a bonus can't make him look under-full.
+        if(nHP===0&&h.title==="The Anchor"){
+          const anchorFull=effStats({...h,_icebergBonus:false,_conductorBonus:false},romRef.current,disRef.current).maxHP;
+          if(h.currentHP>=anchorFull){nHP=1;setLog("⚓ The Anchor held. Nothing short of a second blow takes him down from full strength — he's left at 1 HP.");}
+        }
         if(nHP===0){
           anyKIA=true;
           const isSui=isSuicide(h,allSnap,picked);
@@ -2672,7 +2714,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
       // HERO PANEL
       React.createElement("div",{className:"heroes-panel"+tSec("heroes"),style:{width:heroPanelOpen?SIDE_PANEL_W_HERO:36,minWidth:heroPanelOpen?SIDE_PANEL_W_HERO:36,paddingTop:0,transition:"width 0.2s"}},
         React.createElement("div",{style:{padding:"7px 7px 0",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,whiteSpace:"nowrap"}},
-          heroPanelOpen&&React.createElement("div",{className:"panel-header",style:{flex:1,margin:0}},"◈ HERO ROSTER"),
+          heroPanelOpen&&React.createElement(FitHeader,null,"◈ HERO ROSTER"),
           React.createElement("button",{className:"panel-toggle-btn",onClick:()=>setHeroPanelOpen(o=>!o),title:heroPanelOpen?"Collapse Hero Panel":"Expand Hero Panel"},heroPanelOpen?"◄":"►")
         ),
         heroPanelOpen&&sortedHeroes.map(h=>{
@@ -2694,7 +2736,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
             h.levelUpFlash?"level-up-flash":""
           ].filter(Boolean).join(" ");
           return React.createElement("div",{key:h.id,className:cardCls,style:{position:"relative"},onClick:()=>!isShopL&&!isGameL&&h.status!=="kia"&&h.status!=="rogue"&&setExpandedHero(isExp?null:h.id)},
-            h.speechBubble&&React.createElement("div",{className:"speech-bubble"},h.speechBubble),
+            h.speechBubble&&React.createElement(HeroBubble,{key:"bubble",text:h.speechBubble}),
             React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:0}},
               React.createElement("div",{style:{flex:1}},
                 React.createElement("div",{className:"hero-row"},
@@ -2767,7 +2809,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
       React.createElement("div",{className:"threats-panel",style:{width:threatPanelOpen?SIDE_PANEL_W_THREAT:36,minWidth:threatPanelOpen?SIDE_PANEL_W_THREAT:36,transition:"width 0.2s",overflow:"hidden",flexShrink:0}},
         React.createElement("div",{style:{padding:"7px 7px 0",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}},
           React.createElement("button",{className:"panel-toggle-btn",onClick:()=>setThreatPanelOpen(o=>!o),title:threatPanelOpen?"Collapse Threats Panel":"Expand Threats Panel"},threatPanelOpen?"◄":"►"),
-          threatPanelOpen&&React.createElement("div",{className:"panel-header",style:{flex:1,margin:0}},"◈ ACTIVE THREATS")
+          threatPanelOpen&&React.createElement(FitHeader,null,"◈ ACTIVE THREATS")
         ),
         threatPanelOpen&&React.createElement("div",{className:"threat-list"+tSec("threats")},
           threats.length===0&&React.createElement("div",{style:{fontSize:9,color:"var(--text3)",padding:12,textAlign:"center"}},"No active threats."),
