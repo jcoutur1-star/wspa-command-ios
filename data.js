@@ -166,6 +166,22 @@ const CONFIDENTIAL_BRIEFINGS={
     secretTrait:"[CLASSIFIED — HIDDEN INFORMATION] If The Crimson Knight goes rogue, John is extremely likely to join her. If the Crimson Knight were to die, John would likely leave for good. | Typhon can deal no more than 50 total damage to John regardless of party size.",
     excludeTitles:[]
   },
+  ALI:{
+    heading:"⚠ CONFIDENTIAL — A LETTER FROM THE FORMER DIRECTOR",
+    isAliLetter:true,
+    portrait:"portraits/Alinote.png",
+    salutation:"To my replacement.",
+    paragraphs:[
+      "Sometimes we need to learn things several times before they stick. Sometimes they never do. I don’t have superpowers, and very likely neither do you. So what does that make of us? It would seem that the obvious answer is the same thing that a superhero would say.",
+      "We do what we can.",
+      "The world is always falling apart. That’s what people said 500 years ago, 1000 years ago, and 5000 years ago. And yet it’s still here. Dynasties will come and go.",
+      "So what can we do?",
+      "We love our friends and family. We support them. We remind them one extra time that we love them, even when it may be awkward or cringey. We reach out to people. We leave our comfort zone. Even if only in small steps. We reach out, we discuss, we play, we imagine, we create, and we wonder.\nThe heart is nourished by these things. The same heart that gives an ordinary person the strength to accomplish wonders.",
+      "And when the dance is done, we thank the audience, our costars, and the stage.\nNow go enjoy the dance. Thank you for taking care of my team…"
+    ],
+    signoff:"-Former Director Abbas Ali",
+    excludeTitles:[]
+  },
   LEGENDS:{
     heading:"⚠ CONFIDENTIAL — WSPA LEGENDS ARCHIVE",
     desc:"An archive of the no-longer-active roster, broken out by the age they served. Modern Age losses are logged here for institutional memory. Silver and Golden Age files are being retained in full pending a possible reactivation initiative — for now, only status, real name, power level, and abilities are cleared for viewing.",
