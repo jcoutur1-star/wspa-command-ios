@@ -2319,7 +2319,7 @@ function App(){
           React.createElement("div",{style:{fontSize:12,color:"var(--text3)",marginBottom:16}},"World Security & Protection Agency"),
           React.createElement("div",{style:{fontSize:11,color:"var(--text3)",letterSpacing:1,marginBottom:6,fontFamily:"var(--font-head)"}},"KNOWN ACCESS CODES"),
           React.createElement("div",{style:{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}},
-            ["KRONOS","TYPHON","MANIAC","SILPHANA","LEVIATHAN","JOHN","TCK","AEROS","LEGENDS","WSPA"].map(p=>React.createElement("div",{key:p,style:{fontSize:11,color:"var(--text2)",border:"1px solid var(--text3)",borderRadius:4,padding:"4px 10px"}},p))
+            ["KRONOS","TYPHON","MANIAC","SILPHANA","LEVIATHAN","JOHN","TCK","AEROS","LEGENDS","ALI","WSPA"].map(p=>React.createElement("div",{key:p,style:{fontSize:11,color:"var(--text2)",border:"1px solid var(--text3)",borderRadius:4,padding:"4px 10px"}},p))
           ),
           React.createElement("div",{style:{fontSize:11,color:"var(--text3)",letterSpacing:1,marginBottom:10,fontFamily:"var(--font-head)"}},"CURRENT ORGANIZATIONAL CHART"),
           React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:14,marginBottom:24}},
@@ -2386,6 +2386,25 @@ function App(){
                 aeros.epilogue.lines.map((line,i)=>React.createElement("div",{key:i,style:{fontSize:13,color:"#33ff88",fontStyle:"italic",lineHeight:1.6,marginBottom:8,textShadow:"0 0 10px rgba(51,255,136,.25)"}},line))
               )
             )
+          )
+        )
+      );
+    }
+
+    // ── ALI: farewell letter from the former Director (own layout) ──
+    if(confUnlocked==="ALI"){
+      const ali=CONFIDENTIAL_BRIEFINGS.ALI;
+      return React.createElement("div",{className:"full-panel",style:{background:"#000"}},
+        React.createElement("div",{className:"full-panel-header"},
+          React.createElement("div",{className:"full-panel-title"},ali.heading),
+          React.createElement("button",{className:"mbtn",style:{padding:"4px 12px"},onClick:()=>{setScreen("hq");setConfUnlocked(null);setConfPassInput("");}},"← EXIT")
+        ),
+        React.createElement("div",{className:"full-panel-body"},
+          React.createElement("div",{style:{maxWidth:640,margin:"0 auto",padding:"20px 12px"}},
+            ali.portrait&&React.createElement("img",{src:ali.portrait,alt:"Letter from Abbas Ali",style:{width:"100%",maxWidth:340,borderRadius:4,border:"1px solid var(--gold)",display:"block",margin:"0 auto 20px"},onError:e=>{e.target.style.display="none";}}),
+            React.createElement("div",{style:{fontSize:14,color:"var(--gold)",fontStyle:"italic",marginBottom:16,lineHeight:1.8}},ali.salutation),
+            ali.paragraphs.map((p,i)=>React.createElement("div",{key:i,style:{fontSize:13,color:"var(--text2)",lineHeight:1.9,whiteSpace:"pre-line",marginBottom:16}},p)),
+            React.createElement("div",{style:{fontSize:13,color:"var(--gold)",fontStyle:"italic",textAlign:"right",marginTop:24}},ali.signoff)
           )
         )
       );
