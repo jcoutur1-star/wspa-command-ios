@@ -340,9 +340,19 @@ function calcDmgRaw(outcome,hero,threat,allDeployed){
 // about damage is untouched; this is a flat multiplier applied on top of
 // whatever calcDmgRaw already computed.
 function calcDmg(outcome,hero,threat,allDeployed){
-  const result=calcDmgRaw(outcome,hero,threat,allDeployed);
+  let result=calcDmgRaw(outcome,hero,threat,allDeployed);
   if(result==null||typeof result.health!=="number")return result;
   const allHeroes=allDeployed||[hero];
+  // ── Per-threat damage modifiers (data-driven flags on the threat) ──
+  if(threat){
+    let dmg=result.health;
+    if(threat.femaleX2&&hero.isFemale)dmg*=2;
+    if(threat.maleX2&&hero.isMale)dmg*=2;
+    if(threat.tankX2&&hero.cls==="tank")dmg*=2;
+    if(threat.extraPerHeroOver4)dmg+=Math.max(0,allHeroes.length-4)*threat.extraPerHeroOver4;
+    if(threat.bonusDamage&&threat.bonusDamage.titles.includes(hero.title))dmg+=threat.bonusDamage.amount;
+    result={...result,health:dmg};
+  }
   const classesPresent=new Set(allHeroes.map(h=>h.cls));
   const protectedClass=(hero.cls==="cannon"&&classesPresent.has("tank"))||
                         (hero.cls==="support"&&classesPresent.has("cannon"))||
