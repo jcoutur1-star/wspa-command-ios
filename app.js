@@ -902,6 +902,7 @@ function App(){
     if(!tutorialActive||!tutorialStep)return"";
     const hl=tutorialHighlightFor(tutorialStep);
     if(hl==="none")return"";
+    if(name==="pr"&&tutorialStep==="heroes")return""; // only the roster is highlighted; dock stays clickable for Continue
     return hl.includes(name)?" tutorial-spotlight":" tutorial-dim";
   }
   function getTutorialDialogue(){
@@ -1412,6 +1413,7 @@ function App(){
       }
 
       const pts=outcome!=="failure"?(outcome==="success"?threat.reward:Math.floor(threat.reward/2)):0;
+      const xpEach=assigned.length>5?Math.round(pts/assigned.length*100)/100:pts; // teams over 5 split the XP
       const allSnap=hRef.current;
       let johnShouldTurn=false;
       const veteranEvents=[];
@@ -1554,7 +1556,7 @@ function App(){
           return{...h,currentHP:0,status:"kia",_icebergBonus:false,_conductorBonus:false,speechBubble:null};
         }
         const st=nHP<(h.functionalAt||0)?"exhausted":nHP<maxHP?"resting":"ready";
-        const thresh=xpToLevel(h);const nXP=(h.xp||0)+pts;
+        const thresh=xpToLevel(h);const nXP=Math.round(((h.xp||0)+xpEach)*100)/100;
         let nc=h.career;let didLv=false;
         if(nXP>=thresh&&CAREER[h.career]?.next){nc=CAREER[h.career].next;didLv=true;levelUps.push({title:h.title,to:nc});
           // Collect veteran events instead of calling nested setHeroes
@@ -1563,7 +1565,7 @@ function App(){
           if(h.title==="Corvair"&&nc==="veteran")veteranEvents.push("corvair");
           if(h.title==="Skull Crusher"&&nc==="veteran")veteranEvents.push("skullcrusher");
         }
-        return{...h,currentHP:nHP,status:st,regenTimer:0,xp:didLv?nXP-thresh:nXP,career:nc,levelUpFlash:didLv,_icebergBonus:false,_conductorBonus:false,speechBubble:null,eclipsoLonelyPenalty:h.eclipsoLonelyPenalty&&nc!=="veteran"?true:false};
+        return{...h,currentHP:nHP,status:st,regenTimer:0,xp:didLv?Math.round((nXP-thresh)*100)/100:nXP,career:nc,levelUpFlash:didLv,_icebergBonus:false,_conductorBonus:false,speechBubble:null,eclipsoLonelyPenalty:h.eclipsoLonelyPenalty&&nc!=="veteran"?true:false};
       }));
       // Apply veteran unlock side-effects in a separate, non-nested setHeroes call
       if(veteranEvents.length>0){
@@ -1702,7 +1704,7 @@ function App(){
       if((threat.priority==="red"||threat.priority==="purple"||threat.villainId)&&!threat.tutorialGuaranteed){
         prQueueRef.current.push({kind:"augusta",outcome:outcome==="success"?"win":"loss",threatName:threat.name});
       }
-      setModal({threat,heroes:assigned,outcome,narration,damages,anyKIA,turnedVillain,redeemedVillains,levelUps,xpEarned:pts,newRomMsg,newDisMsg,unlockMsg});
+      setModal({threat,heroes:assigned,outcome,narration,damages,anyKIA,turnedVillain,redeemedVillains,levelUps,xpEarned:xpEach,newRomMsg,newDisMsg,unlockMsg});
       setLog(`Debrief: ${threat.name} — ${outcome.toUpperCase()}${anyKIA?" ⚠ HERO LOST":""}${turnedVillain?` 🔴 ${turnedVillain.title} ROGUE`:""}${levelUps.length?" ⭐ LVL UP":""}${newRomMsg?" 💕":""}`);
       // ── Generate news headline ──
       {
@@ -2773,7 +2775,7 @@ React.createElement("div",{className:"pr-section dock-pr"},
                 !isShopL&&!isGameL&&h.status!=="kia"&&h.status!=="rogue"&&CAREER[h.career]?.next&&React.createElement("div",{className:"xp-row"},
                   React.createElement("div",{className:"xp-label"},"XP"),
                   React.createElement("div",{className:"xp-bar-track"},React.createElement("div",{className:"xp-bar-fill",style:{width:`${xpPct}%`}})),
-                  React.createElement("span",{style:{fontSize:7,color:"var(--gold)",marginLeft:3}},`${h.xp||0}/${thresh}`)
+                  React.createElement("span",{style:{fontSize:7,color:"var(--gold)",marginLeft:3}},`${Math.round((h.xp||0)*10)/10}/${thresh}`)
                 ),
                 isShopL&&React.createElement("div",{style:{fontSize:8,color:"var(--gold)",marginTop:3}},`Unlock in Shop for ${SHOP_PRICE} pts`)
               ),
