@@ -2394,8 +2394,8 @@ function App(){
     }
 
     // ── ALI: farewell letter from the former Director (own layout) ──
-    if(confUnlocked==="ALI"){
-      const ali=CONFIDENTIAL_BRIEFINGS.ALI;
+    if(confUnlocked==="ALI"||CONFIDENTIAL_BRIEFINGS[confUnlocked]?.isAliLetter){
+      const ali=CONFIDENTIAL_BRIEFINGS[confUnlocked];
       return React.createElement("div",{className:"full-panel",style:{background:"#000"}},
         React.createElement("div",{className:"full-panel-header"},
           React.createElement("div",{className:"full-panel-title"},ali.heading),
